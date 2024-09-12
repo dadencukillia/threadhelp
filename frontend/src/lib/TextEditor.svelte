@@ -57,13 +57,16 @@
 	}
 
 	button.post {
-		background: rgb(214,170,48);
-		background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c) fixed;
+		background-color: #3498db;
 		border: 1px solid #ccc;
 		border-top: none;
 		border-radius: 0 0 10px 10px;
 		filter: none;
 		width: 100%;
+	}
+
+	button.post:hover {
+		background-color: #3083bb;
 	}
 
 	:global(div.ql-toolbar) {

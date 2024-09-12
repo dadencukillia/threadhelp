@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,12 +13,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	midLogger "github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/static"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/valyala/fasthttp"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 )
 
 var oauthAllowDomain = os.Getenv("OAUTHALLOWDOMAIN")
@@ -58,15 +63,82 @@ func StartWebServer() error {
 		}
 
 		if content, ok := body["content"]; ok {
-			for _, matched := range regexp.MustCompile("<([[:alpha:]]+)[ \\/>]").FindAllStringSubmatch(content, -1) {
+			if len(content) > 1024*1024*1024*20 {
+				return c.SendStatus(fiber.StatusRequestEntityTooLarge)
+			}
+
+			attachedImages := []string{}
+			contentImages := [][]byte{}
+
+			ctx := &html.Node{
+				Type:     html.ElementNode,
+				DataAtom: atom.Div,
+				Data:     "div",
+			}
+			nodes, err := html.ParseFragment(strings.NewReader(content), ctx)
+			if err != nil {
+				return c.SendStatus(fiber.StatusBadRequest)
+			}
+
+			for _, node := range nodes {
+				ctx.AppendChild(node)
+			}
+
+			doc := goquery.NewDocumentFromNode(ctx)
+
+			if !strings.Contains(content, "<img") && len(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(doc.Text(), " ", ""), "\n", ""), "\t", "")) < 5 {
+				return c.SendStatus(fiber.StatusBadRequest)
+			}
+
+			for _, matched := range regexp.MustCompile("<\\s*([[:alpha:]]+)[ \\/>]").FindAllStringSubmatch(content, -1) {
 				tagName := matched[1]
 				if !slices.Contains(allowedTags, tagName) {
 					return c.SendStatus(fiber.StatusBadRequest)
 				}
 			}
 
-			if strings.Count(content, "<") != strings.Count(content, ">") {
-				return c.SendStatus(fiber.StatusBadRequest)
+			doc.Find("img").Each(func(i int, s *goquery.Selection) {
+				srcVal, ex := s.Attr("src")
+				if !ex {
+					s.Remove()
+					return
+				}
+
+				s.SetAttr("alt", "Post image "+fmt.Sprint(i))
+				ext := ""
+
+				if strings.HasPrefix(srcVal, "data:image/jpeg;base64,") {
+					ext = "jpg"
+				} else if strings.HasPrefix(srcVal, "data:image/png;base64,") {
+					ext = "png"
+				} else if strings.HasPrefix(srcVal, "data:image/webp;base64,") {
+					ext = "webp"
+				}
+
+				if ext != "" {
+					uuidVal, err := uuid.NewRandom()
+					for err != nil {
+						uuidVal, err = uuid.NewRandom()
+					}
+
+					name := uuidVal.String() + "." + ext
+					attachedImages = append(attachedImages, name)
+					base64Data := srcVal[strings.IndexRune(srcVal, ',')+1:]
+					imgData, err := base64.StdEncoding.DecodeString(base64Data)
+					if err != nil {
+						s.Remove()
+						return
+					}
+
+					contentImages = append(contentImages, imgData)
+					s.SetAttr("src", "/images/"+name)
+				}
+			})
+
+			content, err = doc.Html()
+			if err != nil {
+				logger.Println(err)
+				return c.SendStatus(fiber.StatusInternalServerError)
 			}
 
 			con, err := db.Acquire(DBCTX)
@@ -87,7 +159,11 @@ func StartWebServer() error {
 			displayName := c.Locals("displayName")
 			var postId string
 			var pubDate pgtype.Timestamp
-			r := tx.QueryRow(DBCTX, "INSERT INTO posts(userId, userEmail, userDisplayName, content) VALUES($1, $2, $3, $4) RETURNING id, pubDate", userId, email, displayName, content)
+			r := tx.QueryRow(
+				DBCTX,
+				"INSERT INTO posts(userId, userEmail, userDisplayName, content, attachedImages) VALUES($1, $2, $3, $4, $5) RETURNING id, pubDate",
+				userId, email, displayName, content, strings.Join(attachedImages, ","),
+			)
 			if err := r.Scan(&postId, &pubDate); err != nil {
 				logger.Println(err)
 				return c.SendStatus(fiber.StatusInternalServerError)
@@ -98,12 +174,16 @@ func StartWebServer() error {
 				return c.SendStatus(fiber.StatusInternalServerError)
 			}
 
-			jsonData, err := json.Marshal(Post {
-				ID: postId,
-				UserID: userId.(string),
+			for i, imgPath := range attachedImages {
+				os.WriteFile("images/"+imgPath, contentImages[i], 0666)
+			}
+
+			jsonData, err := json.Marshal(Post{
+				ID:              postId,
+				UserID:          userId.(string),
 				UserDisplayName: displayName.(string),
-				Content: content,
-				PubDate: pgtimeToString(pubDate),
+				Content:         content,
+				PubDate:         pgtimeToString(pubDate),
 			})
 			if err != nil {
 				return c.SendStatus(fiber.StatusCreated)
@@ -113,7 +193,7 @@ func StartWebServer() error {
 			defer sseClientsMutex.Unlock()
 			for _, sc := range sseClients {
 				sc.Mutex.Lock()
-				sc.Queue = append(sc.Queue, "newPost;" + string(jsonData))
+				sc.Queue = append(sc.Queue, "newPost;"+string(jsonData))
 				sc.Mutex.Unlock()
 			}
 
@@ -152,10 +232,17 @@ func StartWebServer() error {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		_, err = tx.Exec(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2;", userId, postId)
+		var attachedImages string
+
+		row := tx.QueryRow(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2 RETURNING attachedImages", userId, postId)
+		err = row.Scan(&attachedImages)
 		if err != nil {
 			logger.Println(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		for _, img := range strings.Split(attachedImages, ",") {
+			os.Remove("images/" + img)
 		}
 
 		if err := tx.Commit(DBCTX); err != nil {
@@ -167,7 +254,7 @@ func StartWebServer() error {
 		defer sseClientsMutex.Unlock()
 		for _, sc := range sseClients {
 			sc.Mutex.Lock()
-			sc.Queue = append(sc.Queue, "delPost;" + postId)
+			sc.Queue = append(sc.Queue, "delPost;"+postId)
 			sc.Mutex.Unlock()
 		}
 
@@ -201,14 +288,13 @@ func StartWebServer() error {
 			}
 
 			ret = append(ret, Post{
-				ID: postId,
-				UserID: userId,
+				ID:              postId,
+				UserID:          userId,
 				UserDisplayName: userDisplayName,
-				Content: content,
-				PubDate: pgtimeToString(pubDate),
+				Content:         content,
+				PubDate:         pgtimeToString(pubDate),
 			})
 		}
-
 
 		return c.Status(fiber.StatusOK).JSON(ret)
 	})
@@ -245,11 +331,11 @@ func StartWebServer() error {
 			}
 
 			ret = append(ret, Post{
-				ID: postId,
-				UserID: userId,
+				ID:              postId,
+				UserID:          userId,
 				UserDisplayName: userDisplayName,
-				Content: content,
-				PubDate: pgtimeToString(pubDate),
+				Content:         content,
+				PubDate:         pgtimeToString(pubDate),
 			})
 		}
 
@@ -313,7 +399,7 @@ func StartWebServer() error {
 							return true
 						}
 					}
-					
+
 					clientQ.Queue = []string{}
 
 					return false
@@ -332,6 +418,13 @@ func StartWebServer() error {
 		return c.SendStatus(fiber.StatusNotFound)
 	})
 
+	app.Get("/images/*", static.New(
+		"./images",
+		static.Config{
+			MaxAge:        int((5 * 24 * time.Hour).Seconds()),
+			CacheDuration: 3 * time.Minute,
+		},
+	))
 	app.Use(static.New("./frontend"))
 	app.Use(func(c fiber.Ctx) error {
 		c.Context().SetContentType("text/html")
@@ -361,22 +454,24 @@ func middlewareCheckGoogleAuth(c fiber.Ctx) error {
 		}
 
 		tokenInfo, err := firebaseAuth.VerifyIDTokenAndCheckRevoked(context.Background(), authToken)
-		if err != nil {return false}
+		if err != nil {
+			return false
+		}
 
 		if aEmail, ok := tokenInfo.Claims["email"]; ok {
 			if strEmail, ok := aEmail.(string); ok {
-				if strings.HasSuffix(strEmail, "@" + oauthAllowDomain) {
+				if strings.HasSuffix(strEmail, "@"+oauthAllowDomain) {
 					if aDisplayName, ok := tokenInfo.Claims["name"]; ok {
 						if strDisplayName, ok := aDisplayName.(string); ok {
 							email = strEmail
 							uid = tokenInfo.UID
 							displayName = strDisplayName
 
-							cacheStorage.SetCache("tokenInfo;" + authToken, map[string]string{
-								"email": email,
-								"uid": uid,
+							cacheStorage.SetCache("tokenInfo;"+authToken, map[string]string{
+								"email":       email,
+								"uid":         uid,
 								"displayName": displayName,
-							}, 3 * time.Minute)
+							}, 3*time.Minute)
 
 							return true
 						}
@@ -393,7 +488,7 @@ func middlewareCheckGoogleAuth(c fiber.Ctx) error {
 	c.Locals("email", email)
 	c.Locals("uid", uid)
 	c.Locals("displayName", displayName)
-	
+
 	if IsInBlacklist(email) {
 		return c.SendStatus(fiber.StatusForbidden)
 	}

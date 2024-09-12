@@ -6,13 +6,13 @@ services:
       - "80:80"
     volumes:
       - frontendDist:/home/work/frontend
+      - ./dockerdata/images:/home/work/images
     environment:
       DBADDRESS: postgres://root:thinkdifferent0@db:5432/threadhelp
       OAUTHALLOWDOMAIN: roli.ho.ua
     depends_on:
       db:
         condition: service_healthy
-        restart: true
       frontend:
         condition: service_completed_successfully
 

@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS posts(
 	userEmail text,
 	userDisplayName text,
 	content text,
-	pubDate timestamp without time zone DEFAULT NOW()
+	pubDate timestamp without time zone DEFAULT NOW(),
+	attachedImages text
 );
 `
 	con, err := db.Acquire(DBCTX)
