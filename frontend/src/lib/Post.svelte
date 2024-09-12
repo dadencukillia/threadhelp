@@ -1,0 +1,95 @@
+<script>
+	import auth from '../firebase.js';
+
+	export const postId = "";
+	export let publishTime = "";
+	export let userId = "";
+	export let userDisplayName = "Unknown";
+	export let post = "<h1>Nothing here</h1>";
+	export let onDelete = () => {};
+</script>
+
+<div class="post">
+	<div class="topbar">
+		{#if auth.currentUser.uid === userId }
+			<button on:click={onDelete}>
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash-fill" viewBox="0 0 16 16">
+					<path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5M8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5m3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0"/>
+				</svg>
+			</button>
+		{/if}
+		<span class="user">{ userDisplayName }</span>
+		<span class="date">{ publishTime }</span>
+	</div>
+	<div class="body">
+		<p>{ @html post }</p>
+	</div>
+</div>
+
+<style>
+	.post {
+		animation: slidein 0.2s ease-out;
+	}
+
+	@keyframes slidein {
+		from {
+			scale: 0;
+			filter: opacity(0.0);
+		}
+		
+		to {
+			scale: 1;
+			filter: opacity(1.0);
+		}
+	}
+
+	.topbar {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		border-bottom: 1px solid #eee;
+		padding-bottom: 5px;
+		gap: 5px;
+	}
+
+	.topbar .user {
+		font-weight: bold;
+	}
+
+	.topbar .date {
+		font-size: 12px;
+		color: #333;
+		margin-left: auto;
+	}
+
+	.topbar button {
+		color: white;
+		background-color: red;
+	}
+
+	.topbar button:hover {
+		color: #efefef;
+		background-color: #e11;
+	}
+
+	.body {
+		padding: 10px 0;
+	}
+
+	.post {
+		background-color: white;
+		width: 100%;
+		border: 1px solid #eee;
+		padding: 10px;
+		border-radius: 10px;
+	}
+
+	.body {
+		overflow: auto;
+		width: 100%;
+	}
+
+	:global(img) {
+		max-width: 100%;
+	}
+</style>

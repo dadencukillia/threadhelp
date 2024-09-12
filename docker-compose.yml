@@ -1,0 +1,49 @@
+services:
+  backend:
+    build: ./backend
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - frontendDist:/home/work/frontend
+    environment:
+      DBADDRESS: postgres://root:thinkdifferent0@db:5432/threadhelp
+      OAUTHALLOWDOMAIN: roli.ho.ua
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      frontend:
+        condition: service_completed_successfully
+
+  db:
+    image: "postgres:16.4-alpine3.20"
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: thinkdifferent0
+      POSTGRES_DB: threadhelp
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./dockerdata/dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    volumes:
+      - frontendDist:/home/work/dist
+
+volumes:
+  frontendDist:
