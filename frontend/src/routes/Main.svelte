@@ -1,5 +1,5 @@
 <script>
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	import TextEditor from '../lib/TextEditor.svelte';
 	import {APIGetRequest, APIPostRequest, connectPath} from '../api.js';
@@ -12,6 +12,8 @@
 	let sending = "";
 	let deleting = false;
     
+	let sse;
+
 	export let user;
 
 	async function loadNewPosts() {
@@ -21,6 +23,10 @@
 		}).catch(e => console.log(e));
 	}
 
+	onDestroy(() => {
+		sse.close();
+	});
+
 	onMount(() => {
 		APIGetRequest("tenNewestPosts").then(r => r.json()).then(async r => {
 			posts = r;
@@ -29,7 +35,7 @@
 			let postsToAdd = [];
 			let lastPostLoaded = false;
 
-			const sse = new EventSourcePolyfill(
+			sse = new EventSourcePolyfill(
 				connectPath("events"),
 				{
 					"headers": {
