@@ -61,8 +61,12 @@
 		background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c) fixed;
 		border: 1px solid #ccc;
 		border-top: none;
-		border-radius: 0;
+		border-radius: 0 0 10px 10px;
 		filter: none;
 		width: 100%;
+	}
+
+	:global(div.ql-toolbar) {
+		border-radius: 10px 10px 0 0;
 	}
 </style>
