@@ -153,7 +153,7 @@
 					alert(getLangString("postDeleteError"));
 					deleting = false;
 				});
-			}} postId={postId} userId={userId} userDisplayName={userDisplayName} post={post} publishTime={pubTime} />
+			}} user={user} postId={postId} userId={userId} userDisplayName={userDisplayName} post={post} publishTime={pubTime} />
 		{/each}
 	</container>
 </main>

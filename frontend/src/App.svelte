@@ -1,6 +1,7 @@
 <script>
-    import {onAuthStateChanged} from 'firebase/auth';
-	import auth, {makeSignout} from './firebase.js';
+    import { onAuthStateChanged } from 'firebase/auth';
+	import auth, { makeSignout } from './firebase.js';
+	import { setGlobalVar } from './config.js';
 
 	import Main from './routes/Main.svelte';
 	import Auth from './routes/Auth.svelte';
@@ -8,7 +9,7 @@
 	import Loading from './routes/Loading.svelte';
 
 	import { Router, Route } from "svelte-routing";
-    import {APIGetRequest} from './api.js';
+    import { APIGetRequest } from './api.js';
 
 	let authUser = null;
 	let isLoading = true;
@@ -19,9 +20,16 @@
 		isLoading = true;
 
 		if (user !== null && authUser !== user) {
-			let res;
 			try {
-				res = await APIGetRequest("check");
+				const res = await APIGetRequest("check");
+
+				if (res.status !== 200) {
+					makeSignout();
+					return;
+				}
+
+				const json = await res.json();
+				user["isAdmin"] = json["admin"];
 			} catch {
 				setTimeout(() => {
 					location.reload();
@@ -29,10 +37,6 @@
 				return;
 			}
 
-			if (res.status !== 200) {
-				makeSignout();
-				return;
-			}
 		}
 
 		if (authThread === curAuth) {

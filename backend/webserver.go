@@ -19,6 +19,7 @@ import (
 	midLogger "github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/html"
@@ -40,7 +41,9 @@ func pgtimeToString(pgTime pgtype.Timestamp) string {
 }
 
 func StartWebServer() error {
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 20 * 1024 * 1024,
+	})
 
 	app.Use(midLogger.New())
 	app.Use(cors.New())
@@ -49,7 +52,11 @@ func StartWebServer() error {
 	apiGroup.Use(middlewareCheckGoogleAuth)
 
 	apiGroup.Get("check", func(c fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
+		retInfo := map[string]any{}
+
+		retInfo["admin"] = IsAdmin(c.Locals("email").(string))
+
+		return c.Status(fiber.StatusOK).JSON(retInfo)
 	})
 
 	apiGroup.Post("sendPost", func(c fiber.Ctx) error {
@@ -234,7 +241,12 @@ func StartWebServer() error {
 
 		var attachedImages string
 
-		row := tx.QueryRow(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2 RETURNING attachedImages", userId, postId)
+		var row pgx.Row
+		if IsAdmin(c.Locals("email").(string)) {
+			row = tx.QueryRow(DBCTX, "DELETE FROM posts WHERE id=$1 RETURNING attachedImages", postId)
+		} else {
+			row = tx.QueryRow(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2 RETURNING attachedImages", userId, postId)
+		}
 		err = row.Scan(&attachedImages)
 		if err != nil {
 			logger.Println(err)

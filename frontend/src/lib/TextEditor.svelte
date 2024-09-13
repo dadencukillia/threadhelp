@@ -57,6 +57,7 @@
 	}
 
 	button.post {
+		color: white;
 		background-color: #3498db;
 		border: 1px solid #ccc;
 		border-top: none;
@@ -66,6 +67,7 @@
 	}
 
 	button.post:hover {
+		color: #efefef;
 		background-color: #3083bb;
 	}
 

@@ -36,6 +36,9 @@ func InitTables() error {
 CREATE TABLE IF NOT EXISTS blacklist(
 	gmail text PRIMARY KEY
 );
+CREATE TABLE IF NOT EXISTS admins(
+	gmail text PRIMARY KEY
+);
 CREATE TABLE IF NOT EXISTS posts(
 	id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	userId text,
@@ -81,4 +84,26 @@ func IsInBlacklist(gmail string) bool {
 	cacheStorage.SetCache("userBlacklist;" + gmail, inBlacklist, 10 * time.Minute)
 
 	return inBlacklist
+}
+
+func IsAdmin(gmail string) bool {
+	if cached, found := cacheStorage.GetCache("userAdmin;" + gmail); found {
+		if ret, ok := cached.(bool); ok {
+			return ret
+		}
+	}
+
+	var isAdmin bool = false
+
+	con, err := db.Acquire(DBCTX)
+	if err != nil {return false}
+	defer con.Release()
+
+	if con.QueryRow(DBCTX, "SELECT EXISTS(SELECT 1 FROM admins WHERE gmail=$1 LIMIT 1)", gmail).Scan(&isAdmin) != nil {
+		return false
+	}
+
+	cacheStorage.SetCache("userAdmin;" + gmail, isAdmin, 10 * time.Minute)
+
+	return isAdmin
 }
