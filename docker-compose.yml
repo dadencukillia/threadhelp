@@ -7,6 +7,7 @@ services:
     volumes:
       - frontendDist:/home/work/frontend
       - ./dockerdata/images:/home/work/images
+      - ./${FIREBASEADMINSDK_SECRETKEY_FILENAME}:/home/work/firebaseSecretKey.json
     environment:
       DBADDRESS: postgres://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
       OAUTHALLOWDOMAIN: ${OAUTH_ALLOWED_EMAIL_DOMAIN}
@@ -32,18 +33,18 @@ services:
       timeout: 5s
       retries: 5
 
-  adminer:
-    image: adminer
-    restart: always
-    ports:
-      - "8080:8080"
-    depends_on:
-      - db
-
   frontend:
     build: ./frontend
     volumes:
       - frontendDist:/home/work/dist
+    environment:
+      OAUTH_ALLOWED_EMAIL_DOMAIN: ${OAUTH_ALLOWED_EMAIL_DOMAIN}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
+      FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
 
 volumes:
   frontendDist:
