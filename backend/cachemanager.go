@@ -1,9 +1,13 @@
 package main
 
-import "time"
+import (
+	"time"
+	"sync"
+)
 
 // Cache storage to store the cached data
 type CacheStorage struct {
+	mutex sync.Mutex
 	caches map[string]cache
 }
 
@@ -36,6 +40,9 @@ func (a *CacheStorage) removeExpiredCache() {
 //  storage := NewCacheStorage()
 //  storage.SetCache("tempData", []int{65, 32, 12, 93}, 15 * time.Minute)
 func (a *CacheStorage) SetCache(name string, value any, exp time.Duration) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.removeExpiredCache()
 	a.caches[name] = cache{
 		Value: value,
@@ -48,6 +55,9 @@ func (a *CacheStorage) SetCache(name string, value any, exp time.Duration) {
 //  storage := NewCacheStorage()
 //  storage.SetCacheForever("myData", []int{65, 32, 12, 93})
 func (a *CacheStorage) SetCacheForever(name string, value any) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.removeExpiredCache()
 	a.caches[name] = cache{
 		Value: value,
@@ -61,6 +71,9 @@ func (a *CacheStorage) SetCacheForever(name string, value any) {
 //  storage.SetCacheForever("myData", []int{65, 32, 12, 93})
 //  storage.RemoveCache("myData")
 func (a *CacheStorage) RemoveCache(name string) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.removeExpiredCache()
 	delete(a.caches, name)
 }
@@ -73,6 +86,9 @@ func (a *CacheStorage) RemoveCache(name string) {
 //  storage.RemoveCache("myData")
 //  fmt.Println(storage.GetCache("myData")) // <nil> false
 func (a *CacheStorage) GetCache(name string) (any, bool) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.removeExpiredCache()
 	v, ok := a.caches[name]
 	if !ok {
@@ -111,6 +127,9 @@ func (a *CacheStorage) GetCacheOr(name string, defVal func() any) any {
 //  storage.ClearAll()
 //  fmt.Println(len(storage.CacheList())) // 0
 func (a *CacheStorage) ClearAll() {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	for k := range a.caches {
 		delete(a.caches, k)
 	}
@@ -123,6 +142,9 @@ func (a *CacheStorage) ClearAll() {
 //  storage.SetCacheForever("myData", []int{65, 32, 12, 93})
 //  fmt.Println(storage.Has("myData")) // true
 func (a *CacheStorage) Has(name string) bool {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.removeExpiredCache()
 	for k := range a.caches {
 		if k == name {
@@ -141,6 +163,9 @@ func (a *CacheStorage) Has(name string) bool {
 //  storage.SetCacheForever("myData2", "Hello")
 //  fmt.Println(storage.CacheList()) // [myData myData2]
 func (a *CacheStorage) CacheList() []string {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
 	a.removeExpiredCache()
 	keys := make([]string, 0, len(a.caches))
 	for k := range a.caches {

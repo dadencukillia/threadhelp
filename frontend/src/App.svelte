@@ -1,7 +1,6 @@
 <script>
     import { onAuthStateChanged } from 'firebase/auth';
 	import auth, { makeSignout } from './firebase.js';
-	import { setGlobalVar } from './config.js';
 
 	import Main from './routes/Main.svelte';
 	import Auth from './routes/Auth.svelte';

@@ -1,5 +1,5 @@
-ifneq ($(wildcard ./.env_sample),)
-    include ./.env_sample
+ifneq ($(wildcard ./.env),)
+    include ./.env
     export
 endif
 
@@ -13,4 +13,4 @@ else
 endif
 
 stop:
-	docker-compose -f docker-compose.yml -f docker-compose-adminpanel.yml down
+	docker-compose -f docker-compose.yml -f docker-compose-dbpanel.yml down
