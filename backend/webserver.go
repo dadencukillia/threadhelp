@@ -31,13 +31,9 @@ var sseClientsMutex = sync.Mutex{}
 var sseClients = []*SSEClient{}
 
 type SSEClient struct {
+	PingingSkip uint32
 	Mutex sync.Mutex
 	Queue []string
-}
-
-func pgtimeToString(pgTime pgtype.Timestamp) string {
-	zone, _ := time.LoadLocation("Europe/Kiev")
-	return pgTime.Time.In(zone).Format("2006.01.02 15:04")
 }
 
 func StartWebServer() error {
@@ -190,7 +186,7 @@ func StartWebServer() error {
 				UserID:          userId.(string),
 				UserDisplayName: displayName.(string),
 				Content:         content,
-				PubDate:         pgtimeToString(pubDate),
+				PubDate:         uint64(pubDate.Time.UnixMilli()),
 			})
 			if err != nil {
 				return c.SendStatus(fiber.StatusCreated)
@@ -304,7 +300,7 @@ func StartWebServer() error {
 				UserID:          userId,
 				UserDisplayName: userDisplayName,
 				Content:         content,
-				PubDate:         pgtimeToString(pubDate),
+				PubDate:         uint64(pubDate.Time.UnixMilli()),
 			})
 		}
 
@@ -347,7 +343,7 @@ func StartWebServer() error {
 				UserID:          userId,
 				UserDisplayName: userDisplayName,
 				Content:         content,
-				PubDate:         pgtimeToString(pubDate),
+				PubDate:         uint64(pubDate.Time.UnixMilli()),
 			})
 		}
 
@@ -367,6 +363,7 @@ func StartWebServer() error {
 		ctx.SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 			sseClientsMutex.Lock()
 			clientQ := SSEClient{
+				PingingSkip: 5,
 				Mutex: sync.Mutex{},
 				Queue: []string{},
 			}
@@ -387,11 +384,20 @@ func StartWebServer() error {
 
 			for {
 				if func() bool {
+					// Return true to disconnect
+
 					msgs := []string{"PING"}
 					clientQ.Mutex.Lock()
 					defer clientQ.Mutex.Unlock()
 
-					if len(clientQ.Queue) != 0 {
+					if len(clientQ.Queue) == 0 {
+						if clientQ.PingingSkip == 0 {
+							clientQ.PingingSkip = 5
+						} else {
+							clientQ.PingingSkip -= 1
+							return false
+						}
+					} else {
 						msgs = clientQ.Queue
 					}
 

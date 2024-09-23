@@ -17,7 +17,7 @@ type Post struct {
 	UserID string `json:"userId"`
 	UserDisplayName string `json:"userDisplayName"`
 	Content string `json:"post"`
-	PubDate string `json:"pubTime"`
+	PubDate uint64 `json:"pubTime"`
 }
 
 func InitDB() error {

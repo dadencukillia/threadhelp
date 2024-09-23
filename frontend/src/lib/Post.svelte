@@ -12,7 +12,7 @@
 	const isAdmin = user["isAdmin"];
 </script>
 
-<div class="post">
+<article class="post">
 	<div class="topbar">
 		{#if auth.currentUser.uid === userId || isAdmin }
 			<button on:click={onDelete} class={isAdmin && auth.currentUser.uid !== userId ? "adminblue" : ""}>
@@ -22,16 +22,22 @@
 			</button>
 		{/if}
 		<span class="user">{ userDisplayName }</span>
-		<span class="date">{ publishTime }</span>
+		<span class="date">{ new Date(publishTime).toLocaleString(navigator.language) }</span>
 	</div>
 	<div class="body">
 		<p>{ @html post }</p>
 	</div>
-</div>
+</article>
 
 <style>
 	.post {
 		animation: slidein 0.2s ease-out;
+		background-color: white;
+		width: 100%;
+		border: 1px solid #eee;
+		padding: 10px;
+		border-radius: 10px;
+
 	}
 
 	@keyframes slidein {
@@ -85,17 +91,6 @@
 
 	.body {
 		padding: 10px 0;
-	}
-
-	.post {
-		background-color: white;
-		width: 100%;
-		border: 1px solid #eee;
-		padding: 10px;
-		border-radius: 10px;
-	}
-
-	.body {
 		overflow: auto;
 		width: 100%;
 	}

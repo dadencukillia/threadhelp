@@ -79,7 +79,7 @@
 				while (!lastPostLoaded) {
 					await (new Promise((resolve) => setTimeout(resolve, 10)));
 
-					const postsEl = document.querySelectorAll("div.post");
+					const postsEl = document.querySelectorAll("article.post");
 					if (postsEl.length > 0) {
 						const lastPost = postsEl.item(postsEl.length - 1);
 
@@ -114,48 +114,50 @@
 
 <main>
 	<Header user={user} />
-	<container>
-		<TextEditor onSend={html => {
-			if (sending !== "") {
-				alert(getLangString("postIsSendingError"));
-				return;
-			}
-
-			sending = "smth";
-			APIPostRequest("sendPost", {
-				"content": html,
-			}).then(r => r.text()).then(r => {
-				sending = r;
-			}).catch(() => {
-				sending = "";
-				alert(getLangString("postRequestError"));
-			});
-		}} />
-		{#each posts as {userId, userDisplayName, post, postId, pubTime} (postId)}
-			<Post onDelete={() => {
-				if (deleting) {
-					alert(getLangString("postIsDeletingError"));
+	<div class="wrapper">
+		<container>
+			<TextEditor onSend={html => {
+				if (sending !== "") {
+					alert(getLangString("postIsSendingError"));
 					return;
 				}
-				deleting = true;
 
-				APIPostRequest("deletePost", {
-					"id": postId,
-				}).then(r => {
-					deleting = false;
-					if (r.status === 200) {
-						posts = posts.filter(e => e.postId !== postId);
-					} else {
+				sending = "smth";
+				APIPostRequest("sendPost", {
+					"content": html,
+				}).then(r => r.text()).then(r => {
+					sending = r;
+				}).catch(() => {
+					sending = "";
+					alert(getLangString("postRequestError"));
+				});
+			}} />
+			{#each posts as {userId, userDisplayName, post, postId, pubTime} (postId)}
+				<Post onDelete={() => {
+					if (deleting) {
+						alert(getLangString("postIsDeletingError"));
+						return;
+					}
+					deleting = true;
+
+					APIPostRequest("deletePost", {
+						"id": postId,
+					}).then(r => {
+						deleting = false;
+						if (r.status === 200) {
+							posts = posts.filter(e => e.postId !== postId);
+						} else {
+							alert(getLangString("postDeleteError"));
+							deleting = false;
+						}
+					}).catch(() => {
 						alert(getLangString("postDeleteError"));
 						deleting = false;
-					}
-				}).catch(() => {
-					alert(getLangString("postDeleteError"));
-					deleting = false;
-				});
-			}} user={user} postId={postId} userId={userId} userDisplayName={userDisplayName} post={post} publishTime={pubTime} />
-		{/each}
-	</container>
+					});
+				}} user={user} postId={postId} userId={userId} userDisplayName={userDisplayName} post={post} publishTime={pubTime} />
+			{/each}
+		</container>
+	</div>
 </main>
 
 <style>
@@ -167,6 +169,17 @@
 		max-height: 100vh;
 	}
 
+	.wrapper {
+		width: 100%;
+		height: 100%;
+		flex-grow: 1;
+		overflow: scroll;
+	}
+
+	.wrapper::-webkit-scrollbar {
+		display: none;
+	}
+
 	container {
 		display: flex;
 		flex-direction: column;
@@ -175,12 +188,6 @@
 		max-width: 1200px;
 		height: 100%;
 		padding: clamp(5px, 3vw, 20px);
-		flex-grow: 1;
-		overflow: scroll;
 		margin: 0 auto;
-	}
-
-	container::-webkit-scrollbar {
-		display: none;
 	}
 </style>
