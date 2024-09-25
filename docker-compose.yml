@@ -4,14 +4,16 @@ services:
     restart: always
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - frontendDist:/home/work/frontend
       - ./dockerdata/images:/home/work/images
-      - ./${FIREBASEADMINSDK_SECRETKEY_FILENAME}:/home/work/firebaseSecretKey.json
+      - ./${FIREBASEADMINSDK_SECRETKEY_FILENAME}:/home/work/firebaseSecretKey.json 
     environment:
       DB_ADDRESS: postgres://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
       OAUTH_ALLOW_DOMAIN: ${OAUTH_ALLOWED_EMAIL_DOMAIN}
       WEBP_IMAGE_ENCODING: ${WEBP_IMAGE_ENCODING}
+      USE_HTTPS: "false"
     depends_on:
       db:
         condition: service_healthy
@@ -46,6 +48,6 @@ services:
       FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
       FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID}
       FIREBASE_APP_ID: ${FIREBASE_APP_ID}
-
+ 
 volumes:
   frontendDist:

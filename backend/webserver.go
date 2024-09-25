@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"net/http"
 	"os"
 	"regexp"
 	"slices"
@@ -34,6 +35,8 @@ import (
 
 var oauthAllowDomain = os.Getenv("OAUTH_ALLOW_DOMAIN")
 var webpImageEncoding = os.Getenv("WEBP_IMAGE_ENCODING") == "true"
+var httpsDomain = os.Getenv("HTTPS_DOMAIN")
+var useHttps = os.Getenv("USE_HTTPS") == "true"
 var sseClientsMutex = sync.Mutex{}
 var sseClients = []*SSEClient{}
 
@@ -499,7 +502,31 @@ func StartWebServer() error {
 		return c.Status(fiber.StatusOK).SendFile("./frontend/index.html")
 	})
 
-	return app.Listen(":80")
+	if useHttps {
+		go runHttpRedirector()
+
+		for {
+			time.Sleep(10 * time.Second)
+			logger.Println(app.Listen(":443", fiber.ListenConfig{
+				CertFile: "/etc/letsencrypt/live/" + httpsDomain + "/fullchain.pem",
+				CertKeyFile: "/etc/letsencrypt/live/" + httpsDomain + "/privkey.pem",
+			}))
+		}
+	} else {
+		return app.Listen(":80")
+	}
+}
+
+func runHttpRedirector() {
+	http.Handle("GET /.well-known/acme-challenge/", http.StripPrefix("/.well-known/acme-challenge/", http.FileServer(http.Dir("/.well-known/acme-challenge"))))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		url := r.URL
+		url.Scheme = "https"
+		url.Host = r.Host
+		http.Redirect(w, r, url.String(), http.StatusPermanentRedirect)
+	})
+
+	logger.Fatalln(http.ListenAndServe(":80", nil))
 }
 
 func middlewareCheckGoogleAuth(c fiber.Ctx) error {

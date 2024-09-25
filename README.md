@@ -58,8 +58,18 @@ FIREBASE_APP_ID=1:323094117308:web:8f5971c583eca4ec7d89b9
 5. In the “**Authentication**” tab, enable the “**Google**” provider.
 6. In the settings, go to the “Service accounts” tab and click on the “Generate new private key” button. Rename the downloaded file to `firebaseSecretKey.json` and place it in the repository folder (next to the “.env” and “docker-compose.yml” files).
 
+## HTTPS protocol by Let's Encrypt
+Google OAuth2 recommends using the HTTPS protocol. ThreadHelp provides the ability to set the HTTPS protocol through the **.env** file. To do this, you must have a domain name for the site. The **.env** file contains the parameters `USE_HTTPS`, `HTTPS_EMAIL` and `HTTPS_DOMAIN`. To enable the HTTPS protocol, you need to set `USE_HTTPS` to `true`, enter your email in `HTTPS_EMAIL`, and enter the domain name of your site in `HTTPS_DOMAIN`. Example:
+```
+...
+USE_HTTPS=true
+HTTPS_EMAIL=you@gmail.com
+HTTPS_DOMAIN=example.com
+...
+```
+
 # Important
-The site does not have built-in support for the HTTPS protocol, as required by Google OAuth2. Use ngrok and certbot to add support for the HTTPS protocol.
+The website is intended for a narrow circle of people and may be vulnerable to high traffic. Use it for group communication!
 
 # Launching a website
 To start the site, just run the command `sudo make`, and to stop it - `sudo make stop`. The site will be available on port `80` and at `127.0.0.1` (if running locally).

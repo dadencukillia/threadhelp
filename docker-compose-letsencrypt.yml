@@ -1,0 +1,23 @@
+services:
+  backend:
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - webrootFiles:/.well-known/acme-challenge:ro
+    environment:
+      USE_HTTPS: "true"
+      HTTPS_DOMAIN: ${HTTPS_DOMAIN}
+
+  letsencrypt:
+    image: certbot/certbot:latest
+    entrypoint: ""
+    command: sh -c "certbot certonly --force-renewal --webroot -w /var/www/ -n -d ${HTTPS_DOMAIN} --agree-tos --email ${HTTPS_EMAIL} --rsa-key-size 4096 --preferred-challenges=http && sleep 20d"
+    restart: always
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - webrootFiles:/var/www/.well-known/acme-challenge
+    depends_on:
+      - backend
+ 
+volumes:
+  letsencrypt:
+  webrootFiles:

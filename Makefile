@@ -5,12 +5,15 @@ endif
 
 .DEFAULT_GOAL := run
 
-run:
 ifeq (true, ${USE_DBPANEL})
-	docker-compose -f docker-compose.yml -f docker-compose-dbpanel.yml up --build
-else
-	docker-compose -f docker-compose.yml up --build
+ADDITIONAL_YAMLS := ${ADDITIONAL_YAMLS} -f docker-compose-dbpanel.yml
+endif  
+ifeq (true, ${USE_HTTPS}) 
+ADDITIONAL_YAMLS := ${ADDITIONAL_YAMLS} -f docker-compose-letsencrypt.yml
 endif
 
+run:
+	docker-compose -f docker-compose.yml${ADDITIONAL_YAMLS} up --build
+
 stop:
-	docker-compose -f docker-compose.yml -f docker-compose-dbpanel.yml down
+	docker-compose -f docker-compose.yml -f docker-compose-dbpanel.yml -f docker-compose-letsencrypt.yml down
