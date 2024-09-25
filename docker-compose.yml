@@ -9,8 +9,9 @@ services:
       - ./dockerdata/images:/home/work/images
       - ./${FIREBASEADMINSDK_SECRETKEY_FILENAME}:/home/work/firebaseSecretKey.json
     environment:
-      DBADDRESS: postgres://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
-      OAUTHALLOWDOMAIN: ${OAUTH_ALLOWED_EMAIL_DOMAIN}
+      DB_ADDRESS: postgres://${DB_USER}:${DB_PASS}@db:5432/${DB_NAME}
+      OAUTH_ALLOW_DOMAIN: ${OAUTH_ALLOWED_EMAIL_DOMAIN}
+      WEBP_IMAGE_ENCODING: ${WEBP_IMAGE_ENCODING}
     depends_on:
       db:
         condition: service_healthy

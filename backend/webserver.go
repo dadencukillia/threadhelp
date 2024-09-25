@@ -2,10 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"os"
 	"regexp"
 	"slices"
@@ -21,19 +25,22 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/kolesa-team/go-webp/encoder"
+	"github.com/kolesa-team/go-webp/webp"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
-var oauthAllowDomain = os.Getenv("OAUTHALLOWDOMAIN")
+var oauthAllowDomain = os.Getenv("OAUTH_ALLOW_DOMAIN")
+var webpImageEncoding = os.Getenv("WEBP_IMAGE_ENCODING") == "true"
 var sseClientsMutex = sync.Mutex{}
 var sseClients = []*SSEClient{}
 
 type SSEClient struct {
 	PingingSkip uint32
-	Mutex sync.Mutex
-	Queue []string
+	Mutex       sync.Mutex
+	Queue       []string
 }
 
 func StartWebServer() error {
@@ -124,8 +131,13 @@ func StartWebServer() error {
 						uuidVal, err = uuid.NewRandom()
 					}
 
-					name := uuidVal.String() + "." + ext
-					attachedImages = append(attachedImages, name)
+					var name string
+					if webpImageEncoding {
+						name = uuidVal.String() + ".webp"
+					} else {
+						name = uuidVal.String() + "." + ext
+					}
+
 					base64Data := srcVal[strings.IndexRune(srcVal, ',')+1:]
 					imgData, err := base64.StdEncoding.DecodeString(base64Data)
 					if err != nil {
@@ -133,6 +145,38 @@ func StartWebServer() error {
 						return
 					}
 
+					// Converting png or jpeg file into webp, if WEBP_IMAGE_ENCODING is turned on
+					if webpImageEncoding && ext != "webp" {
+						options, err := encoder.NewLossyEncoderOptions(encoder.PresetDefault, 25)
+						if err != nil {
+							s.Remove()
+							return
+						}
+
+						var img image.Image
+						reader := bytes.NewReader(imgData)
+						if ext == "jpg" {
+							img, err = jpeg.Decode(reader)
+						} else {
+							img, err = png.Decode(reader)
+						}
+
+						if err != nil {
+							s.Remove()
+							return
+						}
+
+						buff := bytes.NewBuffer([]byte{})
+						err = webp.Encode(buff, img, options)
+						if err != nil {
+							s.Remove()
+							return
+						}
+
+						imgData = buff.Bytes()
+					}
+
+					attachedImages = append(attachedImages, name)
 					contentImages = append(contentImages, imgData)
 					s.SetAttr("src", "/images/"+name)
 				}
@@ -364,8 +408,8 @@ func StartWebServer() error {
 			sseClientsMutex.Lock()
 			clientQ := SSEClient{
 				PingingSkip: 5,
-				Mutex: sync.Mutex{},
-				Queue: []string{},
+				Mutex:       sync.Mutex{},
+				Queue:       []string{},
 			}
 			sseClients = append(sseClients, &clientQ)
 			sseClientsMutex.Unlock()
@@ -439,11 +483,17 @@ func StartWebServer() error {
 	app.Get("/images/*", static.New(
 		"./images",
 		static.Config{
+			Compress:      true,
 			MaxAge:        int((5 * 24 * time.Hour).Seconds()),
 			CacheDuration: 3 * time.Minute,
 		},
 	))
-	app.Use(static.New("./frontend"))
+	app.Use(static.New(
+		"./frontend",
+		static.Config{
+			MaxAge: int((2 * 24 * time.Hour).Seconds()),
+		},
+	))
 	app.Use(func(c fiber.Ctx) error {
 		c.Context().SetContentType("text/html")
 		return c.Status(fiber.StatusOK).SendFile("./frontend/index.html")
