@@ -174,7 +174,7 @@ func DeletePost(postId string, userId string) (attachedImages []string, error er
 	var attachedImgs string
 	row := tx.QueryRow(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2 RETURNING attachedImages", userId, postId)
 
-	err = row.Scan(&attachedImages)
+	err = row.Scan(&attachedImgs)
 	if err != nil {
 		return []string{}, err
 	}
@@ -201,7 +201,7 @@ func DeletePostAdmin(postId string) (attachedImages []string, error error) {
 	var attachedImgs string
 	row := tx.QueryRow(DBCTX, "DELETE FROM posts WHERE id=$1 RETURNING attachedImages", postId)
 
-	err = row.Scan(&attachedImages)
+	err = row.Scan(&attachedImgs)
 	if err != nil {
 		return []string{}, err
 	}
