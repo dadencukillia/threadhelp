@@ -1,23 +1,23 @@
 services:
   backend:
     volumes:
-      - letsencrypt:/etc/letsencrypt
+      - ./dockerdata/certs:/etc/letsencrypt
       - webrootFiles:/.well-known/acme-challenge:ro
     environment:
       USE_HTTPS: "true"
       HTTPS_DOMAIN: ${HTTPS_DOMAIN}
 
   letsencrypt:
-    image: certbot/certbot:latest
-    entrypoint: ""
-    command: sh -c "certbot certonly --force-renewal --webroot -w /var/www/ -n -d ${HTTPS_DOMAIN} --agree-tos --email ${HTTPS_EMAIL} --rsa-key-size 4096 --preferred-challenges=http && sleep 20d"
+    build: ./certutil
     restart: always
     volumes:
-      - letsencrypt:/etc/letsencrypt
+      - ./dockerdata/certs:/home/work/certs
       - webrootFiles:/var/www/.well-known/acme-challenge
+    environment:
+      EMAIL: ${HTTPS_EMAIL}
+      DOMAIN: ${HTTPS_DOMAIN}
     depends_on:
       - backend
  
 volumes:
-  letsencrypt:
   webrootFiles:

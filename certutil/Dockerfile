@@ -3,7 +3,6 @@ WORKDIR /home/work
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
-RUN apk add libwebp-dev build-base
 COPY . .
-RUN CGO_ENABLED=1 go build -o app --ldflags "-s -w"
+RUN go build -o app --ldflags "-s -w"
 CMD ./app

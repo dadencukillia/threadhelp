@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -24,8 +25,6 @@ import (
 	midLogger "github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
 	"github.com/valyala/fasthttp"
@@ -191,35 +190,14 @@ func StartWebServer() error {
 				return c.SendStatus(fiber.StatusInternalServerError)
 			}
 
-			con, err := db.Acquire(DBCTX)
+			post, err := AddPost(Post{
+				UserID:          c.Locals("uid").(string),
+				userEmail:       c.Locals("email").(string),
+				UserDisplayName: c.Locals("displayName").(string),
+				Content:         content,
+				attachedImages:  attachedImages,
+			})
 			if err != nil {
-				logger.Println(err)
-				return c.SendStatus(fiber.StatusInternalServerError)
-			}
-			defer con.Release()
-
-			tx, err := con.Begin(DBCTX)
-			if err != nil {
-				logger.Println(err)
-				return c.SendStatus(fiber.StatusInternalServerError)
-			}
-
-			userId := c.Locals("uid")
-			email := c.Locals("email")
-			displayName := c.Locals("displayName")
-			var postId string
-			var pubDate pgtype.Timestamp
-			r := tx.QueryRow(
-				DBCTX,
-				"INSERT INTO posts(userId, userEmail, userDisplayName, content, attachedImages) VALUES($1, $2, $3, $4, $5) RETURNING id, pubDate",
-				userId, email, displayName, content, strings.Join(attachedImages, ","),
-			)
-			if err := r.Scan(&postId, &pubDate); err != nil {
-				logger.Println(err)
-				return c.SendStatus(fiber.StatusInternalServerError)
-			}
-
-			if err := tx.Commit(DBCTX); err != nil {
 				logger.Println(err)
 				return c.SendStatus(fiber.StatusInternalServerError)
 			}
@@ -228,13 +206,7 @@ func StartWebServer() error {
 				os.WriteFile("images/"+imgPath, contentImages[i], 0666)
 			}
 
-			jsonData, err := json.Marshal(Post{
-				ID:              postId,
-				UserID:          userId.(string),
-				UserDisplayName: displayName.(string),
-				Content:         content,
-				PubDate:         uint64(pubDate.Time.UnixMilli()),
-			})
+			jsonData, err := json.Marshal(post)
 			if err != nil {
 				return c.SendStatus(fiber.StatusCreated)
 			}
@@ -247,7 +219,7 @@ func StartWebServer() error {
 				sc.Mutex.Unlock()
 			}
 
-			return c.Status(fiber.StatusOK).SendString(postId)
+			return c.Status(fiber.StatusOK).SendString(post.ID)
 		}
 
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -269,40 +241,24 @@ func StartWebServer() error {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		con, err := db.Acquire(DBCTX)
-		if err != nil {
-			logger.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
-		defer con.Release()
+		isAdmin := IsAdmin(c.Locals("email").(string))
 
-		tx, err := con.Begin(DBCTX)
-		if err != nil {
-			logger.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
+		var attachedImages []string
+		var err error
 
-		var attachedImages string
-
-		var row pgx.Row
-		if IsAdmin(c.Locals("email").(string)) {
-			row = tx.QueryRow(DBCTX, "DELETE FROM posts WHERE id=$1 RETURNING attachedImages", postId)
+		if isAdmin {
+			attachedImages, err = DeletePostAdmin(postId)
 		} else {
-			row = tx.QueryRow(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2 RETURNING attachedImages", userId, postId)
+			attachedImages, err = DeletePost(postId, userId)
 		}
-		err = row.Scan(&attachedImages)
+
 		if err != nil {
-			logger.Println(err)
+			log.Println(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		for _, img := range strings.Split(attachedImages, ",") {
+		for _, img := range attachedImages {
 			os.Remove("images/" + img)
-		}
-
-		if err := tx.Commit(DBCTX); err != nil {
-			logger.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
 		sseClientsMutex.Lock()
@@ -317,41 +273,13 @@ func StartWebServer() error {
 	})
 
 	apiGroup.Get("tenNewestPosts", func(c fiber.Ctx) error {
-		con, err := db.Acquire(DBCTX)
+		posts, err := GetNewestPosts(10)
 		if err != nil {
-			logger.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
-		defer con.Release()
-
-		rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName, content FROM posts ORDER BY pubDate DESC LIMIT 10")
-		defer rows.Close()
-		if err != nil {
-			logger.Println(err)
+			log.Println(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		ret := []Post{}
-
-		for rows.Next() {
-			var postId, userId, userDisplayName, content string
-			var pubDate pgtype.Timestamp
-			err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName, &content)
-			if err != nil {
-				logger.Println(err)
-				return c.SendStatus(fiber.StatusInternalServerError)
-			}
-
-			ret = append(ret, Post{
-				ID:              postId,
-				UserID:          userId,
-				UserDisplayName: userDisplayName,
-				Content:         content,
-				PubDate:         uint64(pubDate.Time.UnixMilli()),
-			})
-		}
-
-		return c.Status(fiber.StatusOK).JSON(ret)
+		return c.Status(fiber.StatusOK).JSON(posts)
 	})
 
 	apiGroup.Get("getNextTenPosts/:postId", func(c fiber.Ctx) error {
@@ -360,41 +288,13 @@ func StartWebServer() error {
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
 
-		con, err := db.Acquire(DBCTX)
+		posts, err := GetNewestPostsFrom(postId, 10)
 		if err != nil {
-			logger.Println(err)
-			return c.SendStatus(fiber.StatusInternalServerError)
-		}
-		defer con.Release()
-
-		rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName, content FROM posts WHERE pubDate < (SELECT pubDate FROM posts WHERE id=$1 LIMIT 1) ORDER BY pubDate DESC LIMIT 10", postId)
-		defer rows.Close()
-		if err != nil {
-			logger.Println(err)
+			log.Println(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		ret := []Post{}
-
-		for rows.Next() {
-			var postId, userId, userDisplayName, content string
-			var pubDate pgtype.Timestamp
-			err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName, &content)
-			if err != nil {
-				logger.Println(err)
-				return c.SendStatus(fiber.StatusInternalServerError)
-			}
-
-			ret = append(ret, Post{
-				ID:              postId,
-				UserID:          userId,
-				UserDisplayName: userDisplayName,
-				Content:         content,
-				PubDate:         uint64(pubDate.Time.UnixMilli()),
-			})
-		}
-
-		return c.Status(fiber.StatusOK).JSON(ret)
+		return c.Status(fiber.StatusOK).JSON(posts)
 	})
 
 	apiGroup.Get("/events", func(c fiber.Ctx) error {
@@ -508,8 +408,8 @@ func StartWebServer() error {
 		for {
 			time.Sleep(10 * time.Second)
 			logger.Println(app.Listen(":443", fiber.ListenConfig{
-				CertFile: "/etc/letsencrypt/live/" + httpsDomain + "/fullchain.pem",
-				CertKeyFile: "/etc/letsencrypt/live/" + httpsDomain + "/privkey.pem",
+				CertFile:    "/etc/letsencrypt/cert.crt",
+				CertKeyFile: "/etc/letsencrypt/privkey.key",
 			}))
 		}
 	} else {
@@ -562,11 +462,18 @@ func middlewareCheckGoogleAuth(c fiber.Ctx) error {
 							uid = tokenInfo.UID
 							displayName = strDisplayName
 
+							expTime := time.UnixMilli(tokenInfo.Expires).Sub(time.Now())
+							cacheTime := 3 * time.Minute
+							
+							if cacheTime > expTime {
+								cacheTime = expTime
+							}
+
 							cacheStorage.SetCache("tokenInfo;"+authToken, map[string]string{
 								"email":       email,
 								"uid":         uid,
 								"displayName": displayName,
-							}, 3*time.Minute)
+							}, cacheTime)
 
 							return true
 						}

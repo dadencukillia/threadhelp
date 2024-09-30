@@ -186,8 +186,9 @@
 		gap: 20px;
 		width: 100%;
 		max-width: 1200px;
-		height: 100%;
+		min-height: 100%;
 		padding: clamp(5px, 3vw, 20px);
+		padding-bottom: 200px;
 		margin: 0 auto;
 	}
 </style>

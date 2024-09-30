@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -12,12 +15,20 @@ var DBADDRESS = os.Getenv("DB_ADDRESS")
 var DBCTX = context.Background()
 var db *pgxpool.Pool
 
+type JSONTime time.Time
+
+func (t JSONTime) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprint(time.Time(t).UnixMilli())), nil
+}
+
 type Post struct {
-	ID              string `json:"postId"`
-	UserID          string `json:"userId"`
-	UserDisplayName string `json:"userDisplayName"`
-	Content         string `json:"post"`
-	PubDate         uint64 `json:"pubTime"`
+	ID              string   `json:"postId"`
+	UserID          string   `json:"userId,omitempty"`
+	UserDisplayName string   `json:"userDisplayName,omitempty"`
+	Content         string   `json:"post"`
+	PubDate         JSONTime `json:"pubTime,omitempty"`
+	userEmail       string
+	attachedImages  []string
 }
 
 func InitDB() error {
@@ -114,4 +125,160 @@ func IsAdmin(gmail string) bool {
 	cacheStorage.SetCache("userAdmin;"+gmail, isAdmin, 10*time.Minute)
 
 	return isAdmin
+}
+
+func AddPost(post Post) (Post, error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return Post{}, err
+	}
+	defer con.Release()
+
+	tx, err := con.Begin(DBCTX)
+	if err != nil {
+		return Post{}, err
+	}
+
+	var pubDate pgtype.Timestamp
+
+	r := tx.QueryRow(
+		DBCTX,
+		"INSERT INTO posts(userId, userEmail, userDisplayName, content, attachedImages) VALUES($1, $2, $3, $4, $5) RETURNING id, pubDate",
+		post.UserID, post.userEmail, post.UserDisplayName, post.Content, strings.Join(post.attachedImages, ","),
+	)
+	if err := r.Scan(&post.ID, &pubDate); err != nil {
+		return Post{}, err
+	}
+
+	post.PubDate = JSONTime(pubDate.Time)
+
+	if err := tx.Commit(DBCTX); err != nil {
+		return Post{}, err
+	}
+
+	return post, nil
+}
+
+func DeletePost(postId string, userId string) (attachedImages []string, error error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return []string{}, err
+	}
+	defer con.Release()
+
+	tx, err := con.Begin(DBCTX)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var attachedImgs string
+	row := tx.QueryRow(DBCTX, "DELETE FROM posts WHERE userId=$1 AND id=$2 RETURNING attachedImages", userId, postId)
+
+	err = row.Scan(&attachedImages)
+	if err != nil {
+		return []string{}, err
+	}
+
+	if err := tx.Commit(DBCTX); err != nil {
+		return []string{}, err
+	}
+
+	return strings.Split(attachedImgs, ","), nil
+}
+
+func DeletePostAdmin(postId string) (attachedImages []string, error error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return []string{}, err
+	}
+	defer con.Release()
+
+	tx, err := con.Begin(DBCTX)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var attachedImgs string
+	row := tx.QueryRow(DBCTX, "DELETE FROM posts WHERE id=$1 RETURNING attachedImages", postId)
+
+	err = row.Scan(&attachedImages)
+	if err != nil {
+		return []string{}, err
+	}
+
+	if err := tx.Commit(DBCTX); err != nil {
+		return []string{}, err
+	}
+
+	return strings.Split(attachedImgs, ","), nil
+}
+
+func GetNewestPosts(count uint32) ([]Post, error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return []Post{}, err
+	}
+	defer con.Release()
+
+	rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName, content FROM posts ORDER BY pubDate DESC LIMIT $1", count)
+	if err != nil {
+		return []Post{}, err
+	}
+
+	defer rows.Close()
+
+	posts := []Post{}
+	for rows.Next() {
+		var postId, userId, userDisplayName, content string
+		var pubDate pgtype.Timestamp
+		err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName, &content)
+		if err != nil {
+			return []Post{}, err
+		}
+
+		posts = append(posts, Post{
+			ID:              postId,
+			UserID:          userId,
+			UserDisplayName: userDisplayName,
+			Content:         content,
+			PubDate:         JSONTime(pubDate.Time),
+		})
+	}
+
+	return posts, nil
+}
+
+func GetNewestPostsFrom(postId string, count uint32) ([]Post, error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return []Post{}, err
+	}
+	defer con.Release()
+
+	rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName, content FROM posts WHERE pubDate < (SELECT pubDate FROM posts WHERE id=$1 LIMIT 1) ORDER BY pubDate DESC LIMIT $2", postId, count)
+	if err != nil {
+		return []Post{}, err
+	}
+
+	defer rows.Close()
+
+	posts := []Post{}
+	for rows.Next() {
+		var postId, userId, userDisplayName, content string
+		var pubDate pgtype.Timestamp
+		err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName, &content)
+		if err != nil {
+			return []Post{}, err
+		}
+
+		posts = append(posts, Post{
+			ID:              postId,
+			UserID:          userId,
+			UserDisplayName: userDisplayName,
+			Content:         content,
+			PubDate:         JSONTime(pubDate.Time),
+		})
+	}
+
+	return posts, nil
 }
