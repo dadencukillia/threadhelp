@@ -1,5 +1,7 @@
 <script>
+    import { onMount } from 'svelte';
 	import auth from '../firebase.js';
+    import getLangString from '../lang.js';
 
 	export let user;
 	export const postId = "";
@@ -10,6 +12,23 @@
 	export let onDelete = () => {};
 
 	const isAdmin = user["isAdmin"];
+
+	let isLarge = false;
+	let isUnfolded = false;
+
+	let postBodyElement;
+	onMount(() => {
+		const observer = new ResizeObserver(() => {
+			const height = postBodyElement.offsetHeight;
+			if (height > 400) {
+				isLarge = true;
+			} else {
+				isLarge = false;
+			}
+		});
+
+		observer.observe(postBodyElement);
+	});
 </script>
 
 <article class="post">
@@ -24,8 +43,11 @@
 		<span class="user">{ userDisplayName }</span>
 		<span class="date">{ new Date(publishTime).toLocaleString(navigator.language) }</span>
 	</div>
-	<div class="body">
+	<div class={"body" + (isLarge && !isUnfolded ? " cut-content" : "")} bind:this={postBodyElement}>
 		<p>{ @html post }</p>
+		{#if isLarge && !isUnfolded }
+		<button on:click={() => { isUnfolded = true }}>{ getLangString("buttonUnfold") }</button>
+		{/if}
 	</div>
 </article>
 
@@ -63,12 +85,16 @@
 
 	.topbar .user {
 		font-weight: bold;
+		text-wrap: nowrap;
+		overflow-x: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.topbar .date {
 		font-size: 12px;
 		color: #333;
 		margin-left: auto;
+		text-wrap: nowrap;
 	}
 
 	.topbar button {
@@ -95,6 +121,19 @@
 		width: 100%;
 	}
 
+	.body.cut-content {
+		position: relative;
+		max-height: 450px;
+		overflow-y: hidden;
+
+		& button {
+			position: absolute;
+			bottom: 5px;
+			left: 50%;
+			transform: translateX(-50%);
+		}
+	}
+	
 	:global(img) {
 		max-width: 100%;
 	}

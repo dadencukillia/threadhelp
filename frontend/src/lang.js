@@ -17,6 +17,7 @@ ukDict.set("postIsSendingError", "Зачекайте поки минулий п�
 ukDict.set("postRequestError", "Пост не було відправлено через невідому помилку");
 ukDict.set("postIsDeletingError", "Зачекайте поки минулий пост видалиться");
 ukDict.set("postDeleteError", "Пост не було видалено через невідому помилку");
+ukDict.set("buttonUnfold", "Показати повністю...");
 translateDict.set("uk", ukDict);
 
 const enDict = new Map();
@@ -33,6 +34,7 @@ enDict.set("postIsSendingError", "Wait until the previous post is sent");
 enDict.set("postRequestError", "The post was not sent due to an unknown error");
 enDict.set("postIsDeletingError", "Wait until the previous post is deleted");
 enDict.set("postDeleteError", "The post was not deleted due to an unknown error");
+enDict.set("buttonUnfold", "Show more...");
 translateDict.set("en", enDict);
 
 let applyLang = defaultLang;

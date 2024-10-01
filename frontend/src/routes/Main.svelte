@@ -9,7 +9,8 @@
     import {EventSourcePolyfill} from 'event-source-polyfill';
 
 	let posts = [];
-	let sending = "";
+	let sending = false;
+	let sendBuffer = [];
 	let deleting = false;
     
 	let sse;
@@ -59,8 +60,14 @@
 				} else if (data.startsWith("newPost;")) {
 					const json = JSON.parse(data.split(";").slice(1).join(";"));
 					console.log("New post: ", json);
-					if (json.postId === sending) {
-						sending = "";
+
+					if (sending) {
+						if (sendBuffer.includes(json.postId)) {
+							sending = false;
+							sendBuffer.length = 0;
+						} else {
+							sendBuffer.push(json.postId);
+						}
 					}
 
 					if (lastPostLoaded) {
@@ -117,18 +124,29 @@
 	<div class="wrapper">
 		<container>
 			<TextEditor onSend={html => {
-				if (sending !== "") {
+				if (sending) {
 					alert(getLangString("postIsSendingError"));
 					return;
 				}
 
-				sending = "smth";
+				sending = true;
 				APIPostRequest("sendPost", {
 					"content": html,
-				}).then(r => r.text()).then(r => {
-					sending = r;
+				}).then(r => {
+					if (r.status !== 200) {
+						return Promise.reject(new Error("invalid status code"));
+					}
+					return r.text();
+				}).then(r => {
+					if (sendBuffer.includes(r)) {
+						sending = false;
+						sendBuffer.length = 0;
+					} else {
+						sendBuffer.push(r);
+					}
 				}).catch(() => {
-					sending = "";
+					sendBuffer.length = 0;
+					sending = false;
 					alert(getLangString("postRequestError"));
 				});
 			}} />

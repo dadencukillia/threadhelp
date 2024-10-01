@@ -29,10 +29,7 @@
 		width: 100%;
 		padding: 10px;
 		gap: 10px;
-
-		background: linear-gradient(0deg, hsla(0, 0%, 82%, 1) 0%, hsla(0, 0%, 100%, 1) 57%, hsla(0, 0%, 79%, 1) 100%);
-		background: -moz-linear-gradient(0deg, hsla(0, 0%, 82%, 1) 0%, hsla(0, 0%, 100%, 1) 57%, hsla(0, 0%, 79%, 1) 100%);
-		background: -webkit-linear-gradient(0deg, hsla(0, 0%, 82%, 1) 0%, hsla(0, 0%, 100%, 1) 57%, hsla(0, 0%, 79%, 1) 100%);
+		border-bottom: 1px solid #ccc;
 	}
 
 	button {
@@ -45,6 +42,9 @@
 
 	span {
 		margin-left: auto;
+		text-wrap: nowrap;
+		overflow-x: hidden;
+		text-overflow: ellipsis;
 	}
 
 	img {

@@ -73,3 +73,7 @@ The website is intended for a narrow circle of people and may be vulnerable to h
 
 # Launching a website
 To start the site, just run the command `sudo make`, and to stop it - `sudo make stop`. The site will be available on port `80` and at `127.0.0.1` (if running locally).
+
+# Tasks
+- Finalize the PWA
+- Improve the look of the interface (especially the “Show more...” button)
