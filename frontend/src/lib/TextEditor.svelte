@@ -1,7 +1,7 @@
 <script>
 	import {Editor} from '@tadashi/svelte-editor-quill';
 
-	import getLangString from '../lang';
+	import { getLangString } from '../langs';
 	import '../assets/quill.snow.css';
 	
 	let options = {

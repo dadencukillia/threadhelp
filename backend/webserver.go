@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -27,7 +26,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kolesa-team/go-webp/encoder"
 	"github.com/kolesa-team/go-webp/webp"
-	"github.com/valyala/fasthttp"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
@@ -36,8 +34,7 @@ var oauthAllowDomain = os.Getenv("OAUTH_ALLOW_DOMAIN")
 var webpImageEncoding = os.Getenv("WEBP_IMAGE_ENCODING") == "true"
 var httpsDomain = os.Getenv("HTTPS_DOMAIN")
 var useHttps = os.Getenv("USE_HTTPS") == "true"
-var sseClientsMutex = sync.Mutex{}
-var sseClients = []*SSEClient{}
+var sse = NewSSEServer()
 
 type SSEClient struct {
 	PingingSkip uint32
@@ -211,13 +208,7 @@ func StartWebServer() error {
 				return c.SendStatus(fiber.StatusCreated)
 			}
 
-			sseClientsMutex.Lock()
-			defer sseClientsMutex.Unlock()
-			for _, sc := range sseClients {
-				sc.Mutex.Lock()
-				sc.Queue = append(sc.Queue, "newPost;"+string(jsonData))
-				sc.Mutex.Unlock()
-			}
+			sse.SendBytes(append([]byte("newPost;"), jsonData...))
 
 			return c.Status(fiber.StatusOK).SendString(post.ID)
 		}
@@ -261,13 +252,7 @@ func StartWebServer() error {
 			os.Remove("images/" + img)
 		}
 
-		sseClientsMutex.Lock()
-		defer sseClientsMutex.Unlock()
-		for _, sc := range sseClients {
-			sc.Mutex.Lock()
-			sc.Queue = append(sc.Queue, "delPost;"+postId)
-			sc.Mutex.Unlock()
-		}
+		sse.SendBytes([]byte("delPost;"+postId))
 
 		return c.SendStatus(fiber.StatusOK)
 	})
@@ -297,87 +282,10 @@ func StartWebServer() error {
 		return c.Status(fiber.StatusOK).JSON(posts)
 	})
 
-	apiGroup.Get("/events", func(c fiber.Ctx) error {
-		ctx := c.Context()
-
-		ctx.SetContentType("text/event-stream")
-		ctx.Response.Header.Set("Cache-Control", "no-cache")
-		ctx.Response.Header.Set("Connection", "keep-alive")
-		ctx.Response.Header.Set("Transfer-Encoding", "chunked")
-		ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
-		ctx.Response.Header.Set("Access-Control-Allow-Headers", "Cache-Control")
-		ctx.Response.Header.Set("Access-Control-Allow-Credentials", "true")
-		ctx.SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
-			sseClientsMutex.Lock()
-			clientQ := SSEClient{
-				PingingSkip: 5,
-				Mutex:       sync.Mutex{},
-				Queue:       []string{},
-			}
-			sseClients = append(sseClients, &clientQ)
-			sseClientsMutex.Unlock()
-
-			defer func() {
-				sseClientsMutex.Lock()
-				defer sseClientsMutex.Unlock()
-				for i, c := range sseClients {
-					if c == &clientQ {
-						sseClients = append(sseClients[:i], sseClients[i+1:]...)
-						return
-					}
-				}
-				ctx.Done()
-			}()
-
-			for {
-				if func() bool {
-					// Return true to disconnect
-
-					msgs := []string{"PING"}
-					clientQ.Mutex.Lock()
-					defer clientQ.Mutex.Unlock()
-
-					if len(clientQ.Queue) == 0 {
-						if clientQ.PingingSkip == 0 {
-							clientQ.PingingSkip = 5
-						} else {
-							clientQ.PingingSkip -= 1
-							return false
-						}
-					} else {
-						msgs = clientQ.Queue
-					}
-
-					for _, msg := range msgs {
-						n, err := fmt.Fprintf(w, "data: %s\n\n", msg)
-						if err != nil {
-							logger.Println(err)
-							return true
-						}
-						if n == 0 {
-							logger.Println("wrong n=0")
-							return true
-						}
-
-						if err := w.Flush(); err != nil {
-							logger.Println(err)
-							return true
-						}
-					}
-
-					clientQ.Queue = []string{}
-
-					return false
-				}() {
-					return
-				}
-
-				time.Sleep(1 * time.Second)
-			}
-		}))
-
-		return nil
-	})
+	{
+		middlewaresSet := sse.FiberMiddlewaresSet()
+		apiGroup.Get("/events", middlewaresSet[0], middlewaresSet[1:]...)
+	}
 
 	apiGroup.Use(func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusNotFound)

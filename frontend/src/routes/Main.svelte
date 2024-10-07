@@ -2,10 +2,10 @@
 	import { onMount, onDestroy } from 'svelte';
 
 	import TextEditor from '../lib/TextEditor.svelte';
-	import {APIGetRequest, APIPostRequest, connectPath} from '../api.js';
+	import {APIGetRequest, APIPostRequest, connectPath} from '../api';
 	import Header from '../lib/Header.svelte';
 	import Post from '../lib/Post.svelte';
-    import getLangString from '../lang';
+    import { getLangString } from '../langs';
     import {EventSourcePolyfill} from 'event-source-polyfill';
 
 	let posts = [];

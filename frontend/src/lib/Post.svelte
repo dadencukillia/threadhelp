@@ -1,7 +1,7 @@
 <script>
-    import { onMount } from 'svelte';
-	import auth from '../firebase.js';
-    import getLangString from '../lang.js';
+    import { onMount, onDestroy } from 'svelte';
+	import auth from '../firebase';
+    import { getLangString } from '../langs';
 
 	export let user;
 	export const postId = "";
@@ -17,8 +17,10 @@
 	let isUnfolded = false;
 
 	let postBodyElement;
+	let observer;
+
 	onMount(() => {
-		const observer = new ResizeObserver(() => {
+		observer = new ResizeObserver(() => {
 			const height = postBodyElement.offsetHeight;
 			if (height > 400) {
 				isLarge = true;
@@ -28,6 +30,10 @@
 		});
 
 		observer.observe(postBodyElement);
+	});
+
+	onDestroy(() => {
+		observer.disconnect();
 	});
 </script>
 
@@ -44,25 +50,32 @@
 		<span class="date">{ new Date(publishTime).toLocaleString(navigator.language) }</span>
 	</div>
 	<div class={"body" + (isLarge && !isUnfolded ? " cut-content" : "")} bind:this={postBodyElement}>
-		<p>{ @html post }</p>
-		{#if isLarge && !isUnfolded }
-		<button on:click={() => { isUnfolded = true }}>{ getLangString("buttonUnfold") }</button>
-		{/if}
+		<p>{ @html post }</p>	
 	</div>
+	{#if isLarge && !isUnfolded }
+		<button on:click={() => { isUnfolded = true }}>{ getLangString("buttonUnfold") }</button>
+	{/if}
 </article>
 
 <style>
 	.post {
-		animation: slidein 0.2s ease-out;
+		position: relative;
+		animation: fadein 0.2s ease-out;
 		background-color: white;
 		width: 100%;
 		border: 1px solid #eee;
 		padding: 10px;
 		border-radius: 10px;
-
 	}
 
-	@keyframes slidein {
+	.post>button {
+		position: absolute;
+		bottom: 5px;
+		left: 50%;
+		transform: translateX(-50%);
+	}
+
+	@keyframes fadein {
 		from {
 			scale: 0;
 			filter: opacity(0.0);
@@ -122,16 +135,8 @@
 	}
 
 	.body.cut-content {
-		position: relative;
 		max-height: 450px;
-		overflow-y: hidden;
-
-		& button {
-			position: absolute;
-			bottom: 5px;
-			left: 50%;
-			transform: translateX(-50%);
-		}
+		overflow-y: hidden;	
 	}
 	
 	:global(img) {

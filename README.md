@@ -77,3 +77,6 @@ To start the site, just run the command `sudo make`, and to stop it - `sudo make
 # Tasks
 - Finalize the PWA
 - Improve the look of the interface (especially the “Show more...” button)
+
+# Contribution
+Contributions are welcomed! You can help refactor the code or something other...

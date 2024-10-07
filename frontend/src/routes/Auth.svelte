@@ -1,6 +1,6 @@
 <script>
-	import {makeAuth} from '../firebase.js';
-    import getLangString from '../lang.js';
+	import {makeAuth} from '../firebase';
+    import { getLangString } from '../langs';
 </script>
 
 <main>

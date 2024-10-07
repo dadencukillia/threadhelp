@@ -1,6 +1,6 @@
 <script>
-    import {navigate} from "svelte-routing";
-import getLangString from "../lang";
+    import {navigate} from 'svelte-routing';
+	import { getLangString } from '../langs';
 
 </script>
 

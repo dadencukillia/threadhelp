@@ -1,6 +1,6 @@
 <script>
-	import getLangString from '../lang.js';
-    import {makeSignout} from "../firebase.js";
+	import { getLangString } from '../langs';
+    import {makeSignout} from "../firebase";
 
 	export let user = {};
 </script>
