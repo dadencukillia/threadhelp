@@ -79,6 +79,13 @@ func StartWebServer() error {
 			attachedImages := []string{}
 			contentImages := [][]byte{}
 
+			for _, matched := range regexp.MustCompile("<\\s*([[:alpha:]]+)[ \\/>]").FindAllStringSubmatch(content, -1) {
+				tagName := matched[1]
+				if !slices.Contains(allowedTags, tagName) {
+					return c.SendStatus(fiber.StatusBadRequest)
+				}
+			}
+
 			ctx := &html.Node{
 				Type:     html.ElementNode,
 				DataAtom: atom.Div,
@@ -99,12 +106,7 @@ func StartWebServer() error {
 				return c.SendStatus(fiber.StatusBadRequest)
 			}
 
-			for _, matched := range regexp.MustCompile("<\\s*([[:alpha:]]+)[ \\/>]").FindAllStringSubmatch(content, -1) {
-				tagName := matched[1]
-				if !slices.Contains(allowedTags, tagName) {
-					return c.SendStatus(fiber.StatusBadRequest)
-				}
-			}
+			clearExtraAttributes(doc.Nodes)
 
 			doc.Find("img").Each(func(i int, s *goquery.Selection) {
 				srcVal, ex := s.Attr("src")
@@ -252,7 +254,7 @@ func StartWebServer() error {
 			os.Remove("images/" + img)
 		}
 
-		sse.SendBytes([]byte("delPost;"+postId))
+		sse.SendBytes([]byte("delPost;" + postId))
 
 		return c.SendStatus(fiber.StatusOK)
 	})
@@ -372,7 +374,7 @@ func middlewareCheckGoogleAuth(c fiber.Ctx) error {
 
 							expTime := time.UnixMilli(tokenInfo.Expires).Sub(time.Now())
 							cacheTime := 3 * time.Minute
-							
+
 							if cacheTime > expTime {
 								cacheTime = expTime
 							}
@@ -403,4 +405,30 @@ func middlewareCheckGoogleAuth(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 	return c.Next()
+}
+
+func clearExtraAttributes(nodes []*html.Node) {
+	for _, node := range nodes {
+		if node.Type == html.ElementNode {
+			{
+				nodeName := node.DataAtom
+				newAttributes := []html.Attribute{}
+
+				for _, attr := range node.Attr {
+					if (nodeName == atom.Img && (attr.Key == "src" || attr.Key == "alt")) ||
+						(nodeName == atom.A && attr.Key == "href") {
+						newAttributes = append(newAttributes, attr)
+					}
+				}
+
+				node.Attr = newAttributes
+			}
+
+			children := []*html.Node{}
+			for child := node.FirstChild; child != nil; child = child.NextSibling {
+				children = append(children, child)
+			}
+			clearExtraAttributes(children)
+		}
+	}
 }
