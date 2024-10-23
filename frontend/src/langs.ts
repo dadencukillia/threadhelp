@@ -1,5 +1,5 @@
 import loadEn from './langs/en';
-import loadUk from './langs/ua';
+import loadUk from './langs/uk';
 
 const defaultLang: string = "en";
 const userLanguages: string[] = navigator.languages.map(e => e.split("-")[0].toLowerCase());
@@ -21,6 +21,7 @@ interface Dictionary {
 	postIsDeletingError: string,
 	postDeleteError: string,
 	buttonUnfold: string,
+	tryAgain: string,
 }
 
 let activeDictionary: Dictionary | null = null;

@@ -193,7 +193,7 @@ func StartWebServer() error {
 				UserID:          c.Locals("uid").(string),
 				userEmail:       c.Locals("email").(string),
 				UserDisplayName: c.Locals("displayName").(string),
-				Content:         content,
+				content:         content,
 				attachedImages:  attachedImages,
 			})
 			if err != nil {
@@ -282,6 +282,21 @@ func StartWebServer() error {
 		}
 
 		return c.Status(fiber.StatusOK).JSON(posts)
+	})
+
+	apiGroup.Get("getPostContent/:postId", func(c fiber.Ctx) error {
+		postId := c.Params("postId", "")
+		if postId == "" {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		postContent, err := GetPostContent(postId)
+		if err != nil {
+			log.Println(err)
+			return c.Status(fiber.StatusInternalServerError).SendString("")
+		}
+
+		return c.Status(fiber.StatusOK).SendString(postContent)
 	})
 
 	{

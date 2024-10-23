@@ -15,6 +15,7 @@ export default () => {
 		"postRequestError": "The post was not sent due to an unknown error",
 		"postIsDeletingError": "Wait until the previous post is deleted",
 		"postDeleteError": "The post was not deleted due to an unknown error",
-		"buttonUnfold": "Show more..."
+		"buttonUnfold": "Show more...",
+		"tryAgain": "Try again",
 	});
 }

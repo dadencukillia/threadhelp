@@ -25,8 +25,8 @@ type Post struct {
 	ID              string   `json:"postId"`
 	UserID          string   `json:"userId,omitempty"`
 	UserDisplayName string   `json:"userDisplayName,omitempty"`
-	Content         string   `json:"post"`
 	PubDate         JSONTime `json:"pubTime,omitempty"`
+	content         string
 	userEmail       string
 	attachedImages  []string
 }
@@ -144,7 +144,7 @@ func AddPost(post Post) (Post, error) {
 	r := tx.QueryRow(
 		DBCTX,
 		"INSERT INTO posts(userId, userEmail, userDisplayName, content, attachedImages) VALUES($1, $2, $3, $4, $5) RETURNING id, pubDate",
-		post.UserID, post.userEmail, post.UserDisplayName, post.Content, strings.Join(post.attachedImages, ","),
+		post.UserID, post.userEmail, post.UserDisplayName, post.content, strings.Join(post.attachedImages, ","),
 	)
 	if err := r.Scan(&post.ID, &pubDate); err != nil {
 		return Post{}, err
@@ -220,7 +220,7 @@ func GetNewestPosts(count uint32) ([]Post, error) {
 	}
 	defer con.Release()
 
-	rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName, content FROM posts ORDER BY pubDate DESC LIMIT $1", count)
+	rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName FROM posts ORDER BY pubDate DESC LIMIT $1", count)
 	if err != nil {
 		return []Post{}, err
 	}
@@ -229,9 +229,9 @@ func GetNewestPosts(count uint32) ([]Post, error) {
 
 	posts := []Post{}
 	for rows.Next() {
-		var postId, userId, userDisplayName, content string
+		var postId, userId, userDisplayName string
 		var pubDate pgtype.Timestamp
-		err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName, &content)
+		err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName)
 		if err != nil {
 			return []Post{}, err
 		}
@@ -240,7 +240,6 @@ func GetNewestPosts(count uint32) ([]Post, error) {
 			ID:              postId,
 			UserID:          userId,
 			UserDisplayName: userDisplayName,
-			Content:         content,
 			PubDate:         JSONTime(pubDate.Time),
 		})
 	}
@@ -255,7 +254,7 @@ func GetNewestPostsFrom(postId string, count uint32) ([]Post, error) {
 	}
 	defer con.Release()
 
-	rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName, content FROM posts WHERE pubDate < (SELECT pubDate FROM posts WHERE id=$1 LIMIT 1) ORDER BY pubDate DESC LIMIT $2", postId, count)
+	rows, err := con.Query(DBCTX, "SELECT id, pubDate, userId, userDisplayName FROM posts WHERE pubDate < (SELECT pubDate FROM posts WHERE id=$1 LIMIT 1) ORDER BY pubDate DESC LIMIT $2", postId, count)
 	if err != nil {
 		return []Post{}, err
 	}
@@ -264,9 +263,9 @@ func GetNewestPostsFrom(postId string, count uint32) ([]Post, error) {
 
 	posts := []Post{}
 	for rows.Next() {
-		var postId, userId, userDisplayName, content string
+		var postId, userId, userDisplayName string
 		var pubDate pgtype.Timestamp
-		err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName, &content)
+		err := rows.Scan(&postId, &pubDate, &userId, &userDisplayName)
 		if err != nil {
 			return []Post{}, err
 		}
@@ -275,10 +274,26 @@ func GetNewestPostsFrom(postId string, count uint32) ([]Post, error) {
 			ID:              postId,
 			UserID:          userId,
 			UserDisplayName: userDisplayName,
-			Content:         content,
 			PubDate:         JSONTime(pubDate.Time),
 		})
 	}
 
 	return posts, nil
+}
+
+func GetPostContent(postId string) (string, error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return "", err
+	}
+	defer con.Release()
+
+	var content string
+
+	row := con.QueryRow(DBCTX, "SELECT content FROM posts WHERE id=$1", postId)
+	if err := row.Scan(&content); err != nil {
+		return "", err
+	}
+
+	return content, nil
 }
