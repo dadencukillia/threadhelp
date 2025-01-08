@@ -25,6 +25,9 @@ git clone github.com/dadencukillia/threadhelp
 
 # Setting up
 1. Rename the `.env_sample` file to `.env`.
+2. If you want users to login in the ThreadHelp system via Google accounts then go to the "OAUTH2 authentification" section, either your users can login as anonimous users just typing specified password ("Anonimous authentification")
+
+## OAUTH2 authentification
 2. Create a project in [Firebase](https://console.firebase.google.com).
 3. On the main project page, click on the tag icon (**</>**) and give the project a name and click on the “Register app” button.
 4. In the **.env** file, change the values of the variables starting with `FIREBASE_` to the corresponding values in the code of the second paragraph.
@@ -57,6 +60,13 @@ FIREBASE_APP_ID=1:323094117308:web:8f5971c583eca4ec7d89b9
 ```
 5. In the “**Authentication**” tab, enable the “**Google**” provider.
 6. In the settings, go to the “Service accounts” tab and click on the “Generate new private key” button. Rename the downloaded file to `firebaseSecretKey.json` and place it in the repository folder (next to the “.env” and “docker-compose.yml” files).
+
+## Anonimous authentification
+2. In the **.env** file set "USE_OAUTH" to "false" and enter passcode in the "PASSWORD" variable.
+```dotenv
+USE_OAUTH=false
+PASSWORD=1234
+```
 
 ## HTTPS protocol by Let's Encrypt
 Google OAuth2 recommends using the HTTPS protocol. ThreadHelp provides the ability to set the HTTPS protocol through the **.env** file. To do this, you must have a domain name for the site. The **.env** file contains the parameters `USE_HTTPS`, `HTTPS_EMAIL` and `HTTPS_DOMAIN`. To enable the HTTPS protocol, you need to set `USE_HTTPS` to `true`, enter your email in `HTTPS_EMAIL`, and enter the domain name of your site in `HTTPS_DOMAIN`. Example:
