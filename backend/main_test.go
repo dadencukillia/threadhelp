@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"threadhelpServer/utils"
 	"time"
 )
 
 func TestJsonTime(t *testing.T) {
 	var now time.Time = time.Now()
-	var jsonNow JSONTime = JSONTime(now)
+	var jsonNow = utils.JSONTime(now)
 	b, err := json.Marshal(jsonNow)
 	if err != nil {
 		t.Fatal(err)

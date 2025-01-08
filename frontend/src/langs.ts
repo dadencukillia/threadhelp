@@ -22,6 +22,9 @@ interface Dictionary {
 	postDeleteError: string,
 	buttonUnfold: string,
 	tryAgain: string,
+	enterPasswordToContinue: string,
+	continue: string,
+	incorrectPassword: string,
 }
 
 let activeDictionary: Dictionary | null = null;

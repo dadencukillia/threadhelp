@@ -36,12 +36,15 @@
 			let postsToAdd = [];
 			let lastPostLoaded = false;
 
+			const headers = {};
+			if (user !== null && user["provider"] === "oauth") {
+				headers["Auth-Token"] = await user.getIdToken();
+			}
+
 			sse = new EventSourcePolyfill(
 				connectPath("events"),
 				{
-					"headers": {
-						"Auth-Token": await user.getIdToken()
-					}
+					"headers": headers
 				}
 			);
 
@@ -78,7 +81,8 @@
 				}
 			}
 
-			sse.onerror = () => {
+			sse.onerror = e => {
+				console.log(e);
 				location.reload();
 			}
 

@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bufio"
@@ -88,7 +88,6 @@ func (a *sseServer) FiberMiddleware() func(c fiber.Ctx) error {
 				select {
 				case msg = <-chMessage:
 					if err := clientInstance.SendMessage(msg); err != nil {
-						logger.Println(err)
 						clientInstance.DeleteFromList(a)
 						return
 					}
@@ -96,7 +95,6 @@ func (a *sseServer) FiberMiddleware() func(c fiber.Ctx) error {
 					break
 				case <-time.After(20 * time.Second):
 					if err := clientInstance.SendMessage([]byte("data: ping\n\n")); err != nil {
-						logger.Println(err)
 						clientInstance.DeleteFromList(a)
 						return
 					}

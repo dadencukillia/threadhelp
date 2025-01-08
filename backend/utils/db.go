@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 
 var DBADDRESS = os.Getenv("DB_ADDRESS")
 var DBCTX = context.Background()
+var cacheStorage *CacheStorage
 var db *pgxpool.Pool
 
 type JSONTime time.Time
@@ -26,17 +27,19 @@ type Post struct {
 	UserID          string   `json:"userId,omitempty"`
 	UserDisplayName string   `json:"userDisplayName,omitempty"`
 	PubDate         JSONTime `json:"pubTime,omitempty"`
-	content         string
-	userEmail       string
-	attachedImages  []string
+	Content         string	`json:"-"`
+	UserEmail       string `json:"-"`
+	AttachedImages  []string `json:"-"`
 }
 
-func InitDB() error {
+func InitDB(cs *CacheStorage) error {
+	cacheStorage = cs
+
 	var err error
 	db, err = pgxpool.New(DBCTX, DBADDRESS)
 
-	if err == nil {
-		logger.Println("DB connected")
+	if err != nil {
+		return err
 	}
 
 	return InitTables()
@@ -144,7 +147,7 @@ func AddPost(post Post) (Post, error) {
 	r := tx.QueryRow(
 		DBCTX,
 		"INSERT INTO posts(userId, userEmail, userDisplayName, content, attachedImages) VALUES($1, $2, $3, $4, $5) RETURNING id, pubDate",
-		post.UserID, post.userEmail, post.UserDisplayName, post.content, strings.Join(post.attachedImages, ","),
+		post.UserID, post.UserEmail, post.UserDisplayName, post.Content, strings.Join(post.AttachedImages, ","),
 	)
 	if err := r.Scan(&post.ID, &pubDate); err != nil {
 		return Post{}, err

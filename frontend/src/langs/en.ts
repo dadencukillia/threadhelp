@@ -17,5 +17,8 @@ export default () => {
 		"postDeleteError": "The post was not deleted due to an unknown error",
 		"buttonUnfold": "Show more...",
 		"tryAgain": "Try again",
+		"enterPasswordToContinue": "Enter the password to continue",
+		"continue": "Continue",
+		"incorrectPassword": "You entered the wrong password",
 	});
 }

@@ -6,7 +6,7 @@ export function connectPath(path) {
 }
 
 export async function APIGetRequest(endpoint) {
-	let authToken = auth.currentUser !== null ? await auth.currentUser.getIdToken() : null;
+	let authToken = (auth === null || auth.currentUser === null) ? null : await auth.currentUser.getIdToken();
 
 	let res = await fetch(connectPath(endpoint), {
 		method: "GET",
@@ -23,7 +23,7 @@ export async function APIGetRequest(endpoint) {
 }
 
 export async function APIPostRequest(endpoint, data) {
-	let authToken = auth.currentUser !== null ? await auth.currentUser.getIdToken() : null;
+	let authToken = (auth === null || auth.currentUser === null) ? null : await auth.currentUser.getIdToken();
 
 	let res = await fetch(connectPath(endpoint), {
 		method: "POST",

@@ -17,5 +17,8 @@ export default () => {
 		"postDeleteError": "Пост не було видалено через невідому помилку",
 		"buttonUnfold": "Показати повністю...",
 		"tryAgain": "Спробувати знову",
+		"enterPasswordToContinue": "Введіть пароль, щоб продовжити",
+		"continue": "Продовжити",
+		"incorrectPassword": "Ви ввели неправильний пароль",
 	});
 }

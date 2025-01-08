@@ -1,5 +1,5 @@
 <script>
-	import {makeAuth} from '../firebase';
+	import { makeAuth } from '../firebase';
     import { getLangString } from '../langs';
 </script>
 

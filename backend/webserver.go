@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +15,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"threadhelpServer/providers"
+	"threadhelpServer/utils"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -30,11 +31,13 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+var useOAuth = os.Getenv("USE_OAUTH") == "true"
+var password = os.Getenv("PASSWORD")
 var oauthAllowDomain = os.Getenv("OAUTH_ALLOW_DOMAIN")
 var webpImageEncoding = os.Getenv("WEBP_IMAGE_ENCODING") == "true"
 var httpsDomain = os.Getenv("HTTPS_DOMAIN")
 var useHttps = os.Getenv("USE_HTTPS") == "true"
-var sse = NewSSEServer()
+var sse = utils.NewSSEServer()
 
 type SSEClient struct {
 	PingingSkip uint32
@@ -51,15 +54,84 @@ func StartWebServer() error {
 	app.Use(cors.New())
 
 	apiGroup := app.Group("/api")
-	apiGroup.Use(middlewareCheckGoogleAuth)
+	var loginProvider providers.Provider
+	if useOAuth {
+		provider, err := providers.NewOAuthProvider(
+			oauthAllowDomain,
+			&cacheStorage,
+		)
+		if err != nil {
+			return err
+		}
 
-	apiGroup.Get("check", func(c fiber.Ctx) error {
-		retInfo := map[string]any{}
+		loginProvider = provider
 
-		retInfo["admin"] = IsAdmin(c.Locals("email").(string))
+		apiGroup.Get("check", func(c fiber.Ctx) error {
+			if !loginProvider.CheckLogin(&c) {
+				return c.Status(fiber.StatusUnauthorized).SendString(loginProvider.GetProviderName())
+			}
+			
+			retInfo := map[string]any{}
 
-		return c.Status(fiber.StatusOK).JSON(retInfo)
+			retInfo["admin"] = utils.IsAdmin(c.Locals("email").(string))
+
+			return c.Status(fiber.StatusOK).JSON(retInfo)
+		})
+	} else {
+		provider := providers.NewPasscodeProvider()
+		loginProvider = provider
+
+		apiGroup.Get("logout", func(c fiber.Ctx) error {
+			if loginProvider.CheckLogin(&c) {
+				c.Set("Set-Cookie", "Auth-Token=; expires=Thu, 01 Jan 1970 00:00:00 GMT;")
+				return c.SendStatus(fiber.StatusOK)
+			}
+
+			return c.Status(fiber.StatusUnauthorized).SendString(loginProvider.GetProviderName())
+		})
+
+		apiGroup.Post("check", func(c fiber.Ctx) error {	
+			loggedIn := loginProvider.CheckLogin(&c)
+			if loggedIn {
+				user := providers.PasscodeUser{
+					Name: c.Locals("displayName").(string),
+					Id: c.Locals("uid").(string),
+					IssuedAt: c.Locals("iat").(int64),
+				}
+				return c.Status(fiber.StatusOK).JSON(user)
+			}
+
+			
+			var body map[string]string
+			if json.Unmarshal(c.Body(), &body) != nil {
+				return c.SendStatus(fiber.StatusBadRequest)
+			}
+
+			passcode := body["password"]
+			if passcode == password {
+				user := provider.GenerateNewUser()
+				c.Cookie(&fiber.Cookie{
+					Name: "Auth-Token",
+					Value: provider.GetUserToken(user),
+				})
+				return c.Status(fiber.StatusOK).JSON(user)
+			}
+
+			return c.Status(fiber.StatusUnauthorized).SendString(provider.GetProviderName())
+		})
+	}
+
+	apiGroup.Get("provider", func(c fiber.Ctx) error {
+		return c.Status(fiber.StatusOK).SendString(loginProvider.GetProviderName())
 	})
+
+	apiGroup.Use(func(c fiber.Ctx) error {
+		if !loginProvider.CheckLogin(&c) {
+			return c.Status(fiber.StatusUnauthorized).SendString(loginProvider.GetProviderName())
+		}
+
+		return c.Next()
+	})	
 
 	apiGroup.Post("sendPost", func(c fiber.Ctx) error {
 		allowedTags := []string{
@@ -189,12 +261,12 @@ func StartWebServer() error {
 				return c.SendStatus(fiber.StatusInternalServerError)
 			}
 
-			post, err := AddPost(Post{
+			post, err := utils.AddPost(utils.Post{
 				UserID:          c.Locals("uid").(string),
-				userEmail:       c.Locals("email").(string),
+				UserEmail:       c.Locals("email").(string),
 				UserDisplayName: c.Locals("displayName").(string),
-				content:         content,
-				attachedImages:  attachedImages,
+				Content:         content,
+				AttachedImages:  attachedImages,
 			})
 			if err != nil {
 				logger.Println(err)
@@ -234,15 +306,15 @@ func StartWebServer() error {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
 
-		isAdmin := IsAdmin(c.Locals("email").(string))
+		isAdmin := utils.IsAdmin(c.Locals("email").(string))
 
 		var attachedImages []string
 		var err error
 
 		if isAdmin {
-			attachedImages, err = DeletePostAdmin(postId)
+			attachedImages, err = utils.DeletePostAdmin(postId)
 		} else {
-			attachedImages, err = DeletePost(postId, userId)
+			attachedImages, err = utils.DeletePost(postId, userId)
 		}
 
 		if err != nil {
@@ -260,7 +332,7 @@ func StartWebServer() error {
 	})
 
 	apiGroup.Get("tenNewestPosts", func(c fiber.Ctx) error {
-		posts, err := GetNewestPosts(10)
+		posts, err := utils.GetNewestPosts(10)
 		if err != nil {
 			log.Println(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
@@ -275,7 +347,7 @@ func StartWebServer() error {
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
 
-		posts, err := GetNewestPostsFrom(postId, 10)
+		posts, err := utils.GetNewestPostsFrom(postId, 10)
 		if err != nil {
 			log.Println(err)
 			return c.SendStatus(fiber.StatusInternalServerError)
@@ -290,7 +362,7 @@ func StartWebServer() error {
 			return c.SendStatus(fiber.StatusBadRequest)
 		}
 
-		postContent, err := GetPostContent(postId)
+		postContent, err := utils.GetPostContent(postId)
 		if err != nil {
 			log.Println(err)
 			return c.Status(fiber.StatusInternalServerError).SendString("")
@@ -352,74 +424,6 @@ func runHttpRedirector() {
 	})
 
 	logger.Fatalln(http.ListenAndServe(":80", nil))
-}
-
-func middlewareCheckGoogleAuth(c fiber.Ctx) error {
-	var email, uid, displayName string
-
-	if !func() bool {
-		authToken := c.Get("Auth-Token", "")
-		if len(authToken) == 0 {
-			return false
-		}
-
-		if tokenInfo, ok := cacheStorage.GetCache("tokenInfo;" + authToken); ok {
-			if mapTokenInfo, ok := tokenInfo.(map[string]string); ok {
-				email = mapTokenInfo["email"]
-				uid = mapTokenInfo["uid"]
-				displayName = mapTokenInfo["displayName"]
-
-				return true
-			}
-		}
-
-		tokenInfo, err := firebaseAuth.VerifyIDTokenAndCheckRevoked(context.Background(), authToken)
-		if err != nil {
-			return false
-		}
-
-		if aEmail, ok := tokenInfo.Claims["email"]; ok {
-			if strEmail, ok := aEmail.(string); ok {
-				if strings.HasSuffix(strEmail, "@"+oauthAllowDomain) {
-					if aDisplayName, ok := tokenInfo.Claims["name"]; ok {
-						if strDisplayName, ok := aDisplayName.(string); ok {
-							email = strEmail
-							uid = tokenInfo.UID
-							displayName = strDisplayName
-
-							expTime := time.UnixMilli(tokenInfo.Expires).Sub(time.Now())
-							cacheTime := 3 * time.Minute
-
-							if cacheTime > expTime {
-								cacheTime = expTime
-							}
-
-							cacheStorage.SetCache("tokenInfo;"+authToken, map[string]string{
-								"email":       email,
-								"uid":         uid,
-								"displayName": displayName,
-							}, cacheTime)
-
-							return true
-						}
-					}
-				}
-			}
-		}
-
-		return false
-	}() {
-		return c.SendStatus(fiber.StatusUnauthorized)
-	}
-
-	c.Locals("email", email)
-	c.Locals("uid", uid)
-	c.Locals("displayName", displayName)
-
-	if IsInBlacklist(email) {
-		return c.SendStatus(fiber.StatusForbidden)
-	}
-	return c.Next()
 }
 
 func clearExtraAttributes(nodes []*html.Node) {
