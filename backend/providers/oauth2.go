@@ -15,7 +15,7 @@ import (
 type OAuthProvider struct {
 	firebaseAuth *auth.Client
 	cacheStorage *utils.CacheStorage
-	AllowDomain string
+	AllowDomain  string
 }
 
 func NewOAuthProvider(allowDomain string, cacheStorage *utils.CacheStorage) (OAuthProvider, error) {
@@ -32,7 +32,7 @@ func NewOAuthProvider(allowDomain string, cacheStorage *utils.CacheStorage) (OAu
 
 	return OAuthProvider{
 		firebaseAuth: firebaseAuth,
-		AllowDomain: allowDomain,
+		AllowDomain:  allowDomain,
 	}, nil
 }
 
@@ -91,7 +91,7 @@ func (a OAuthProvider) CheckLogin(c *fiber.Ctx) bool {
 
 		return false
 	}() {
-		return false		
+		return false
 	}
 
 	(*c).Locals("email", email)

@@ -27,8 +27,8 @@ type Post struct {
 	UserID          string   `json:"userId,omitempty"`
 	UserDisplayName string   `json:"userDisplayName,omitempty"`
 	PubDate         JSONTime `json:"pubTime,omitempty"`
-	Content         string	`json:"-"`
-	UserEmail       string `json:"-"`
+	Content         string   `json:"-"`
+	UserEmail       string   `json:"-"`
 	AttachedImages  []string `json:"-"`
 }
 
@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS posts(
 	content text,
 	pubDate timestamp without time zone DEFAULT NOW(),
 	attachedImages text
+);
+CREATE TABLE IF NOT EXISTS likes(
+	userId text,
+	postId text
 );
 `
 	con, err := db.Acquire(DBCTX)
@@ -299,4 +303,86 @@ func GetPostContent(postId string) (string, error) {
 	}
 
 	return content, nil
+}
+
+func AddLike(userId string, postId string) error {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return err
+	}
+	defer con.Release()
+
+	tx, err := con.Begin(DBCTX)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(DBCTX, "INSERT INTO likes(userId, postId) SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM likes WHERE userId=$1 AND postId=$2)", userId, postId)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(DBCTX); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func RemoveLike(userId string, postId string) error {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return err
+	}
+	defer con.Release()
+
+	tx, err := con.Begin(DBCTX)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(DBCTX, "DELETE FROM likes WHERE userId=$1 AND postId=$2", userId, postId)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(DBCTX); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func GetPostLikes(postId string) (uint64, error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return 0, err
+	}
+	defer con.Release()
+
+	var count uint64
+
+	row := con.QueryRow(DBCTX, "SELECT COUNT(1) FROM likes WHERE postId=$1", postId)
+	if err := row.Scan(&count); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func CheckUserLikedPost(userId string, postId string) (bool, error) {
+	con, err := db.Acquire(DBCTX)
+	if err != nil {
+		return true, err
+	}
+	defer con.Release()
+
+	var liked bool
+
+	row := con.QueryRow(DBCTX, "SELECT EXISTS(SELECT 1 FROM likes WHERE userId=$1 AND postId=$2)", userId, postId)
+	if err := row.Scan(&liked); err != nil {
+		return true, err
+	}
+
+	return liked, nil
 }

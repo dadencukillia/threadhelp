@@ -1,9 +1,13 @@
 <script>
-	import {Editor} from '@tadashi/svelte-editor-quill';
+	import Quill from 'quill';
 
 	import { getLangString } from '../langs';
 	import '../assets/quill.snow.css';
+    import {onMount} from 'svelte';
 	
+	let editorContainer;
+	let quill;
+
 	let options = {
 		modules: {
 			toolbar: [
@@ -20,11 +24,6 @@
 	let html = '';
 	let text = '';
 
-	const onTextChange = event => {
-		;({text, html} = event?.detail ?? {});
-		data = html;
-	};
-
 	const onPostSend = () => {
 		if (!html.includes("<img") && text.replaceAll(" ", "").replaceAll("\n", "").replaceAll("\t", "").length < 5) {
 			alert(getLangString("emptyPostError"));
@@ -37,17 +36,28 @@
 
 		onSend(html);
 
+		if (quill) {
+			quill.setText("");
+		}
 		data = "";
+		html = "";
+		text = "";
 	}
 
-	export let onSend = html => {};
+	export let onSend = (html) => {};
+
+	onMount(async () => {
+		quill = new Quill(editorContainer, options);
+		quill.setText(data);
+		quill.on("text-change", (delta, oldDelta, source) => {
+			data = quill.getText();
+			text = data;
+			html = quill.getSemanticHTML();
+		});
+	});
 </script>
 <form on:submit|preventDefault={onPostSend}>
-	<Editor
-	  {options}
-	  {data}
-	  on:text-change={onTextChange}
-	/>
+	<div bind:this={editorContainer} />
 	<button type="submit" class="post">{ getLangString("post") }</button>
 </form>
 

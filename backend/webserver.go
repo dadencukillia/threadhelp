@@ -70,7 +70,7 @@ func StartWebServer() error {
 			if !loginProvider.CheckLogin(&c) {
 				return c.Status(fiber.StatusUnauthorized).SendString(loginProvider.GetProviderName())
 			}
-			
+
 			retInfo := map[string]any{}
 
 			retInfo["admin"] = utils.IsAdmin(c.Locals("email").(string))
@@ -90,18 +90,17 @@ func StartWebServer() error {
 			return c.Status(fiber.StatusUnauthorized).SendString(loginProvider.GetProviderName())
 		})
 
-		apiGroup.Post("check", func(c fiber.Ctx) error {	
+		apiGroup.Post("check", func(c fiber.Ctx) error {
 			loggedIn := loginProvider.CheckLogin(&c)
 			if loggedIn {
 				user := providers.PasscodeUser{
-					Name: c.Locals("displayName").(string),
-					Id: c.Locals("uid").(string),
+					Name:     c.Locals("displayName").(string),
+					Id:       c.Locals("uid").(string),
 					IssuedAt: c.Locals("iat").(int64),
 				}
 				return c.Status(fiber.StatusOK).JSON(user)
 			}
 
-			
 			var body map[string]string
 			if json.Unmarshal(c.Body(), &body) != nil {
 				return c.SendStatus(fiber.StatusBadRequest)
@@ -111,7 +110,7 @@ func StartWebServer() error {
 			if passcode == password {
 				user := provider.GenerateNewUser()
 				c.Cookie(&fiber.Cookie{
-					Name: "Auth-Token",
+					Name:  "Auth-Token",
 					Value: provider.GetUserToken(user),
 				})
 				return c.Status(fiber.StatusOK).JSON(user)
@@ -131,7 +130,7 @@ func StartWebServer() error {
 		}
 
 		return c.Next()
-	})	
+	})
 
 	apiGroup.Post("sendPost", func(c fiber.Ctx) error {
 		allowedTags := []string{
@@ -331,6 +330,72 @@ func StartWebServer() error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
+	apiGroup.Post("likePost", func(c fiber.Ctx) error {
+		var body map[string]string
+		if json.Unmarshal(c.Body(), &body) != nil {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		postId, ok := body["id"]
+		if !ok {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		userId, ok := c.Locals("uid").(string)
+		if !ok {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		postUuid, err := uuid.Parse(postId)
+		if err != nil {
+			log.Println(err)
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		err = utils.AddLike(userId, postUuid.String())
+		if err != nil {
+			log.Println(err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		sse.SendBytes([]byte("updateLikes;" + postId))
+
+		return c.SendStatus(fiber.StatusOK)
+	})
+
+	apiGroup.Post("unlikePost", func(c fiber.Ctx) error {
+		var body map[string]string
+		if json.Unmarshal(c.Body(), &body) != nil {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		postId, ok := body["id"]
+		if !ok {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		userId, ok := c.Locals("uid").(string)
+		if !ok {
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		postUuid, err := uuid.Parse(postId)
+		if err != nil {
+			log.Println(err)
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		err = utils.RemoveLike(userId, postUuid.String())
+		if err != nil {
+			log.Println(err)
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+
+		sse.SendBytes([]byte("updateLikes;" + postId))
+
+		return c.SendStatus(fiber.StatusOK)
+	})
+
 	apiGroup.Get("tenNewestPosts", func(c fiber.Ctx) error {
 		posts, err := utils.GetNewestPosts(10)
 		if err != nil {
@@ -369,6 +434,30 @@ func StartWebServer() error {
 		}
 
 		return c.Status(fiber.StatusOK).SendString(postContent)
+	})
+
+	apiGroup.Get("getPostLikes/:postId", func(c fiber.Ctx) error {
+		postId := c.Params("postId", "")
+		if postId == "" {
+			return c.SendStatus(fiber.StatusBadRequest)
+		}
+
+		postLikes, err := utils.GetPostLikes(postId)
+		if err != nil {
+			log.Println(err)
+			return c.Status(fiber.StatusInternalServerError).SendString("{}")
+		}
+
+		liked, err := utils.CheckUserLikedPost(c.Locals("uid").(string), postId)
+		if err != nil {
+			log.Println(err)
+			return c.Status(fiber.StatusInternalServerError).SendString("{}")
+		}
+
+		return c.Status(fiber.StatusOK).JSON(map[string]any{
+			"liked": liked,
+			"likes": postLikes,
+		})
 	})
 
 	{

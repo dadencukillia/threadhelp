@@ -14,12 +14,27 @@
 	let deleting = false;
     
 	let sse;
+	let postCommunication = new Map();
 
 	export let user;
 
+	function addPosts(postsToAdd) {
+		posts = postsToAdd.map(e => {
+			postCommunication.set(e["postId"], {});
+			return e;
+		}).concat(posts);
+	};
+
+	function addPostsToEnd(postsToAdd) {
+		posts = posts.concat(postsToAdd.map(e => {
+			postCommunication.set(e["postId"], {});
+			return e;
+		}));
+	};
+
 	async function loadNewPosts() {
-		return APIGetRequest("getNextTenPosts/" + posts.at(posts.length - 1).postId).then(r => r.json()).then(r => {
-			posts = posts.concat(r);
+		return APIGetRequest("getNextTenPosts/" + posts.at(-1).postId).then(r => r.json()).then(r => {
+			addPostsToEnd(r);
 			return r.length;
 		}).catch(e => console.log(e));
 	}
@@ -30,7 +45,7 @@
 
 	onMount(() => {
 		APIGetRequest("tenNewestPosts").then(r => r.json()).then(async r => {
-			posts = r;
+			addPosts(r);
 			
 			let postsToRemove = [];
 			let postsToAdd = [];
@@ -56,6 +71,7 @@
 					console.log("Delete post: ", postId);
 
 					if (lastPostLoaded) {
+						postCommunication.delete(postId);
 						posts = posts.filter(e => e.postId !== postId);
 					} else {
 						postsToRemove.push(postId);
@@ -74,9 +90,17 @@
 					}
 
 					if (lastPostLoaded) {
-						posts = [json].concat(posts);
+						addPosts([json]);
 					} else {
 						postsToAdd.push(json);
+					}
+				} else if (data.startsWith("updateLikes;")) {
+					const postId = data.split(";")[1];
+					console.log("Update likes: ", postId);
+
+					const post = postCommunication.get(postId);
+					if (post) {
+						post["updateLikes"]();
 					}
 				}
 			}
@@ -104,11 +128,12 @@
 					}
 
 					if (postsToAdd.length !== 0) {
-						posts = postsToAdd.concat(posts);
+						addPosts(postsToAdd);
 						postsToAdd = [];
 					}
 					if (postsToRemove.length !== 0) {
 						for (let postId of postsToRemove) {
+							postCommunication.delete(postId);
 							posts = posts.filter(e => e.postId !== postId);
 						}
 
@@ -154,7 +179,7 @@
 					alert(getLangString("postRequestError"));
 				});
 			}} />
-			{#each posts as {userId, userDisplayName, post, postId, pubTime} (postId)}
+			{#each posts as {userId, userDisplayName, postId, pubTime} (postId)}
 				<Post onDelete={() => {
 					if (deleting) {
 						alert(getLangString("postIsDeletingError"));
@@ -167,6 +192,7 @@
 					}).then(r => {
 						deleting = false;
 						if (r.status === 200) {
+							postCommunication.delete(postId);
 							posts = posts.filter(e => e.postId !== postId);
 						} else {
 							alert(getLangString("postDeleteError"));
@@ -176,7 +202,7 @@
 						alert(getLangString("postDeleteError"));
 						deleting = false;
 					});
-				}} user={user} postId={postId} userId={userId} userDisplayName={userDisplayName} post={post} publishTime={pubTime} />
+				}} user={user} postId={postId} userId={userId} userDisplayName={userDisplayName} publishTime={pubTime} outCommunication={postCommunication.get(postId)} />
 			{/each}
 		</container>
 	</div>

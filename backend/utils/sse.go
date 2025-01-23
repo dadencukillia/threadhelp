@@ -17,20 +17,20 @@ import (
 
 type sseServer struct {
 	serverClose chan struct{}
-	clients []client
-	mutex sync.Mutex
+	clients     []client
+	mutex       sync.Mutex
 }
 
 type client struct {
-	writer *bufio.Writer
-	ctx *fasthttp.RequestCtx
+	writer      *bufio.Writer
+	ctx         *fasthttp.RequestCtx
 	sendMessage chan []byte
 }
 
 func NewSSEServer() sseServer {
 	return sseServer{
 		clients: []client{},
-		mutex: sync.Mutex{},
+		mutex:   sync.Mutex{},
 	}
 }
 
@@ -73,8 +73,8 @@ func (a *sseServer) FiberMiddleware() func(c fiber.Ctx) error {
 		c.Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 			chMessage := make(chan []byte)
 			clientInstance := client{
-				writer: w,
-				ctx: ctx,
+				writer:      w,
+				ctx:         ctx,
 				sendMessage: chMessage,
 			}
 

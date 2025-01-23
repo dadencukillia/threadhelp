@@ -12,9 +12,9 @@ import (
 )
 
 type PasscodeUser struct {
-	Name string `json:"name"`
-	Id string `json:"id"`
-	IssuedAt int64 `json:"iat"`
+	Name     string `json:"name"`
+	Id       string `json:"id"`
+	IssuedAt int64  `json:"iat"`
 }
 
 func (a PasscodeUser) Valid() error {
@@ -37,7 +37,7 @@ type PasscodeProvider struct {
 
 func NewPasscodeProvider() PasscodeProvider {
 	b := make([]byte, 32)
-    rand.Read(b)
+	rand.Read(b)
 
 	return PasscodeProvider{
 		secretKey: string(b),
@@ -56,8 +56,8 @@ func (a *PasscodeProvider) GenerateNewUser() PasscodeUser {
 	name := namePreffixes[mrand.IntN(len(namePreffixes))] + "-" + nameSuffixes[mrand.IntN(len(nameSuffixes))] + fmt.Sprint(mrand.Int32())
 
 	user := PasscodeUser{
-		Name: name,
-		Id: uid.String(),
+		Name:     name,
+		Id:       uid.String(),
 		IssuedAt: time.Now().UnixMilli(),
 	}
 
@@ -67,8 +67,8 @@ func (a *PasscodeProvider) GenerateNewUser() PasscodeUser {
 func (a PasscodeProvider) GetUserToken(user PasscodeUser) string {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"name": user.Name,
-		"id": user.Id,
-		"iat": user.IssuedAt,
+		"id":   user.Id,
+		"iat":  user.IssuedAt,
 	})
 
 	strToken, _ := token.SignedString([]byte(a.secretKey))
@@ -129,8 +129,8 @@ func (a PasscodeProvider) CheckLogin(c *fiber.Ctx) bool {
 	}
 
 	claims := PasscodeUser{
-		Name: nameStr,
-		Id: idStr,
+		Name:     nameStr,
+		Id:       idStr,
 		IssuedAt: int64(iatFloat),
 	}
 

@@ -6,6 +6,7 @@ require (
 	firebase.google.com/go/v4 v4.14.1
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/gofiber/fiber/v3 v3.0.0-beta.3
+	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/kolesa-team/go-webp v1.0.4
@@ -29,7 +30,6 @@ require (
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/utils/v2 v2.0.0-beta.6 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect

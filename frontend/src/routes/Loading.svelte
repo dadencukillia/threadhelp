@@ -22,9 +22,4 @@
 		height: clamp(20px, 50vw, 300px);
 		animation: spin 1s cubic-bezier(0, 0, 0, 1.06) infinite;
 	}
-
-	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
-	}
 </style>
