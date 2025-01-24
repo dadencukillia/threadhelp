@@ -74,7 +74,7 @@
 	}
 
 	async function setLiked(newValue) {
-		likesLoading = false;
+		likesLoading = true;
 
 		if (newValue) {
 			try {
@@ -290,6 +290,8 @@
 			width: 100%;
 
 			& pre {
+				min-width: 100%;
+				width: fit-content;
 				display: block;
 				border-radius: 3px;
 				padding: 5px 10px;

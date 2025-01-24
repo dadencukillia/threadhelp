@@ -134,7 +134,7 @@ func StartWebServer() error {
 
 	apiGroup.Post("sendPost", func(c fiber.Ctx) error {
 		allowedTags := []string{
-			"p", "img", "strong", "a", "em", "u", "pre", "span",
+			"p", "img", "strong", "a", "em", "u", "pre", "span", "ul", "ol", "li",
 		}
 
 		var body map[string]string

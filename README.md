@@ -64,8 +64,10 @@ FIREBASE_APP_ID=1:323094117308:web:8f5971c583eca4ec7d89b9
 ## Anonimous authentification
 2. In the **.env** file set "USE_OAUTH" to "false" and enter passcode in the "PASSWORD" variable.
 ```dotenv
+...
 USE_OAUTH=false
 PASSWORD=1234
+...
 ```
 
 ## HTTPS protocol by Let's Encrypt
@@ -86,7 +88,7 @@ To start the site, just run the command `sudo make`, and to stop it - `sudo make
 
 # Tasks
 - Finalize the PWA
-- Improve the look of the interface (especially the “Show more...” button)
+- Make admin panel
 
 # Contribution
 Contributions are welcomed! You can help refactor the code or something other...
