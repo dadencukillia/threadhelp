@@ -33,6 +33,7 @@ func NewOAuthProvider(allowDomain string, cacheStorage *utils.CacheStorage) (OAu
 	return OAuthProvider{
 		firebaseAuth: firebaseAuth,
 		AllowDomain:  allowDomain,
+		cacheStorage: cacheStorage,
 	}, nil
 }
 
