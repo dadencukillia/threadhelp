@@ -29,7 +29,7 @@
 	let likes = 0;
 
 	const isAdmin = user["isAdmin"] ?? false;
-	const selfUid = user["provider"] === "oauth" ? user.currentUser.uid : user.info.id;
+	const selfUid = user["provider"] === "oauth" ? user.uid : user.info.id;
 
 	let isLarge = false;
 	let isUnfolded = false;
